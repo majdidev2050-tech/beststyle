@@ -1,20 +1,31 @@
 :root {
-  --bg-primary: #0f111a;
-  --bg-secondary: #1a1d27;
-  --bg-glass: rgba(26, 29, 39, 0.7);
-  --text-primary: #ffffff;
-  --text-secondary: #a0a8c3;
-  --accent-color: #6366f1;
-  --accent-glow: rgba(99, 102, 241, 0.5);
-  --accent-hover: #4f46e5;
+  /* --- Version Lumineuse / Moderne Pro --- */
+  --bg-primary: #f8fafc;
+  /* Fond de page gris très clair (Slate 50) */
+  --bg-secondary: #ffffff;
+  /* Blanc pur pour les cartes et panels */
+  --bg-glass: rgba(255, 255, 255, 0.75);
+  /* Effet verre blanc translucide */
+  --text-primary: #0f172a;
+  /* Texte principal presque noir (Slate 900) */
+  --text-secondary: #64748b;
+  /* Texte secondaire gris moyen (Slate 500) */
+  --accent-color: #4f46e5;
+  /* Indigo moderne (Indigo 600) */
+  --accent-glow: rgba(79, 70, 229, 0.15);
+  --accent-hover: #4338ca;
   --danger-color: #ef4444;
   --success-color: #10b981;
-  --border-color: rgba(255, 255, 255, 0.1);
+  --border-color: #e2e8f0;
+  /* Bordures claires et discrètes (Slate 200) */
   --radius-sm: 8px;
   --radius-md: 12px;
   --radius-lg: 20px;
-  --transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   --font-main: 'Inter', system-ui, sans-serif;
+
+  /* Largeur max globale de l'application */
+  --max-width: 1280px;
 }
 
 * {
@@ -34,30 +45,43 @@ body {
   flex-direction: column;
 }
 
+/* --- AJOUT CRUCIAL : Conteneur de page pour gérer la largeur de l'écran --- */
+.app-container {
+  width: 100%;
+  max-width: var(--max-width);
+  margin: 0 auto;
+  /* Centre la page horizontalement */
+  padding: 2rem 1.5rem;
+  /* Marges internes pour éviter de coller aux bords */
+}
+
 a {
-  color: var(--text-primary);
+  color: var(--accent-color);
   text-decoration: none;
   transition: color var(--transition);
 }
 
 a:hover {
-  color: var(--accent-color);
+  color: var(--accent-hover);
 }
 
+/* --- Panneau Effet de Verre Lumineux --- */
 .glass-panel {
+  background: var(--bg-secondary);
+  /* Repli si backdrop-filter non supporté */
   background: var(--bg-glass);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
 }
 
 .btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 0.75rem 1.5rem;
+  padding: 0.65rem 1.5rem;
   border-radius: var(--radius-sm);
   font-weight: 600;
   font-size: 0.95rem;
@@ -70,60 +94,68 @@ a:hover {
 .btn-primary {
   background: var(--accent-color);
   color: #fff;
-  box-shadow: 0 4px 14px var(--accent-glow);
+  box-shadow: 0 4px 12px var(--accent-glow);
 }
 
 .btn-primary:hover {
   background: var(--accent-hover);
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px var(--accent-glow);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px var(--accent-glow);
 }
 
 .btn-secondary {
-  background: transparent;
+  background: var(--bg-secondary);
   color: var(--text-primary);
   border: 1px solid var(--border-color);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
 }
 
 .btn-secondary:hover {
-  background: rgba(255, 255, 255, 0.05);
-  transform: translateY(-2px);
+  background: var(--bg-primary);
+  border-color: #cbd5e1;
+  transform: translateY(-1px);
 }
 
+/* --- Inputs plus visibles et propres --- */
 .input-field {
   width: 100%;
-  padding: 0.75rem 1rem;
-  background: rgba(255, 255, 255, 0.03);
+  padding: 0.65rem 0.85rem;
+  background: var(--bg-secondary);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-sm);
   color: var(--text-primary);
   font-family: var(--font-main);
   transition: all var(--transition);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.02);
 }
 
 .input-field:focus {
   border-color: var(--accent-color);
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--bg-secondary);
   box-shadow: 0 0 0 3px var(--accent-glow);
 }
 
+/* Fallback couleur pour les placeholders */
+.input-field::placeholder {
+  color: #94a3b8;
+}
+
 .form-group {
-  margin-bottom: 1.5rem;
+  margin-bottom: 1.25rem;
 }
 
 .form-label {
   display: block;
-  margin-bottom: 0.5rem;
-  font-size: 0.9rem;
+  margin-bottom: 0.4rem;
+  font-size: 0.88rem;
   color: var(--text-secondary);
-  font-weight: 500;
+  font-weight: 600;
+  /* Légèrement plus épais pour la lisibilité sur fond clair */
 }
 
 .page-title {
-  font-size: 2rem;
-  font-weight: 700;
-  margin-bottom: 2rem;
-  background: linear-gradient(135deg, #fff, #a0a8c3);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
+  font-size: 1.85rem;
+  font-weight: 800;
+  margin-bottom: 1.5rem;
+  color: var(--text-primary);
 }

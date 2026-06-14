@@ -24,7 +24,6 @@
 				});
 			}
 		}
-		// Reset file input value so same files can be re-selected if removed
 		(event.target as HTMLInputElement).value = '';
 	}
 
@@ -58,7 +57,10 @@
 	<div>
 		<span class="badge-total">
 			{#if data.searchText || data.dateDebut || data.dateFin}
-				{data.projects.length} résultat{data.projects.length > 1 ? 's' : ''} trouvé{data.projects.length > 1 ? 's' : ''}
+				{data.projects.length} résultat{data.projects.length > 1 ? 's' : ''} trouvé{data.projects
+					.length > 1
+					? 's'
+					: ''}
 			{:else}
 				{data.projects.length} projet{data.projects.length > 1 ? 's' : ''} au total (max 100)
 			{/if}
@@ -71,9 +73,16 @@
 	{/if}
 </div>
 
-<form method="GET" class="search-form glass-panel" style="margin-bottom: 1.5rem; display: grid; grid-template-columns: 1.5fr 1fr 1fr auto; gap: 0.75rem; align-items: center; padding: 0.75rem 1rem;">
+<form
+	method="GET"
+	class="search-filter-bar"
+	style="margin-bottom: 1.5rem; display: grid; grid-template-columns: 1.5fr 1fr 1fr auto; gap: 0.75rem; align-items: center; padding: 0.75rem 1rem;"
+>
 	<div style="position: relative; display: flex; align-items: center;">
-		<span style="position: absolute; left: 0.75rem; color: var(--text-secondary); pointer-events: none;">🔍</span>
+		<span
+			style="position: absolute; left: 0.75rem; color: var(--text-secondary); pointer-events: none;"
+			>🔍</span
+		>
 		<input
 			type="text"
 			name="search_text"
@@ -104,14 +113,23 @@
 		/>
 	</div>
 	<div style="display: flex; gap: 0.5rem;">
-		<button type="submit" class="btn btn-primary" style="margin: 0; padding: 0.5rem 1.25rem; white-space: nowrap;">Filtrer</button>
+		<button
+			type="submit"
+			class="btn btn-primary"
+			style="margin: 0; padding: 0.5rem 1.25rem; white-space: nowrap;">Filtrer</button
+		>
 		{#if data.searchText || data.dateDebut || data.dateFin}
-			<a href="?" class="btn btn-secondary" style="margin: 0; padding: 0.5rem 1rem; display: inline-flex; align-items: center; justify-content: center; text-decoration: none; font-size: 0.85rem; height: 38px; box-sizing: border-box;">✕ Réinitialiser</a>
+			<a
+				href="?"
+				class="btn btn-secondary"
+				style="margin: 0; padding: 0.5rem 1rem; display: inline-flex; align-items: center; justify-content: center; text-decoration: none; font-size: 0.85rem; height: 38px; box-sizing: border-box;"
+				>✕ Réinitialiser</a
+			>
 		{/if}
 	</div>
 </form>
 
-<div class="glass-panel table-container">
+<div class="table-wrapper table-container">
 	<table class="data-table">
 		<thead>
 			<tr>
@@ -164,7 +182,7 @@
 						<div class="dates">
 							{#if project.startDate || project.dueDate}
 								<span class="date-range"
-									>{project.startDate || '—'} to {project.dueDate || '—'}</span
+									>{project.startDate || '—'} au {project.dueDate || '—'}</span
 								>
 							{:else}
 								<span class="text-secondary">Aucune date définie</span>
@@ -179,7 +197,7 @@
 								>
 								<form method="POST" action="?/delete" use:enhance style="display:inline;">
 									<input type="hidden" name="id" value={project.id} />
-									<button class="btn-icon danger" title="Delete">🗑️</button>
+									<button class="btn-icon danger" title="Supprimer">🗑️</button>
 								</form>
 							{:else}
 								<button class="btn-icon" onclick={() => openEditModal(project)} title="Détails"
@@ -205,10 +223,9 @@
 	</table>
 </div>
 
-<!-- CREATE PROJECT MODAL -->
 {#if showCreateModal}
 	<div class="modal-backdrop">
-		<div class="modal glass-panel">
+		<div class="modal large-modal">
 			<div class="modal-header">
 				<h3>Créer un projet</h3>
 				<button class="btn-close" onclick={() => (showCreateModal = false)}>✕</button>
@@ -225,116 +242,129 @@
 					return async ({ update }) => {
 						await update();
 						showCreateModal = false;
-						selectedImages.forEach(img => URL.revokeObjectURL(img.preview));
+						selectedImages.forEach((img) => URL.revokeObjectURL(img.preview));
 						selectedImages = [];
 					};
 				}}
 			>
-				<!-- uuid, created_at, updated_at, created_by : générés automatiquement côté serveur -->
-				<div class="form-group">
-					<label class="form-label" for="projectName">Nom du projet *</label>
-					<input class="input-field" type="text" id="projectName" name="projectName" required />
-				</div>
-				<div class="form-group">
-					<label class="form-label" for="clientId">Client *</label>
-					<select class="input-field" id="clientId" name="clientId" required>
-						<option value="" disabled selected>Sélectionner un client...</option>
-						{#each data.clients as client}
-							<option value={client.id}>{client.companyName}</option>
-						{/each}
-					</select>
-				</div>
-				<div class="form-group">
-					<label class="form-label" for="description">Description</label>
-					<textarea class="input-field textarea-field" id="description" name="description" rows="2"
-					></textarea>
-				</div>
-				<div class="form-row">
-					<div class="form-group">
-						<label class="form-label" for="statusProject">Statut</label>
-						<select class="input-field" id="statusProject" name="statusProject">
-							<option value="PLANNING">Planification</option>
-							<option value="ACTIVE">Actif</option>
-							<option value="ON_HOLD">En pause</option>
-							<option value="COMPLETED">Terminé</option>
-							<option value="CANCELLED">Annulé</option>
-						</select>
-					</div>
-					<div class="form-group">
-						<label class="form-label" for="priority">Priorité</label>
-						<select class="input-field" id="priority" name="priority">
-							<option value="LOW">Faible</option>
-							<option value="MEDIUM" selected>Moyen</option>
-							<option value="HIGH">Élevé</option>
-							<option value="URGENT">Urgent</option>
-						</select>
-					</div>
-				</div>
-				<div class="form-row">
-					<div class="form-group">
-						<label class="form-label" for="budgetAmount">Budget (DT)</label>
-						<input
-							class="input-field"
-							type="number"
-							step="0.01"
-							id="budgetAmount"
-							name="budgetAmount"
-							value="0"
-						/>
-					</div>
-					<div class="form-group">
-						<label class="form-label" for="reference">Référence</label>
-						<input
-							class="input-field"
-							type="text"
-							id="reference"
-							name="reference"
-							placeholder="ex. REF-2024-001"
-						/>
-					</div>
-				</div>
-				<div class="form-row">
-					<div class="form-group">
-						<label class="form-label" for="startDate">Date de début</label>
-						<input class="input-field" type="date" id="startDate" name="startDate" />
-					</div>
-					<div class="form-group">
-						<label class="form-label" for="dueDate">Date limite</label>
-						<input class="input-field" type="date" id="dueDate" name="dueDate" />
-					</div>
-				</div>
-
-				<!-- IMAGE UPLOAD MODULE -->
-				<div class="form-group image-upload-section">
-					<label class="form-label">Images du projet</label>
-					<div class="image-upload-wrapper">
-						<label class="image-upload-dropzone">
-							<span class="upload-icon">📷</span>
-							<span class="upload-text">Ajouter des images</span>
-							<span class="upload-hint">PNG, JPG ou GIF</span>
-							<input
-								type="file"
-								name="images"
-								multiple
-								accept="image/*"
-								onchange={handleFileChange}
-								style="display: none;"
-							/>
-						</label>
-					</div>
-
-					{#if selectedImages.length > 0}
-						<div class="image-preview-grid">
-							{#each selectedImages as img, idx}
-								<div class="image-preview-card">
-									<img src={img.preview} alt="Aperçu" class="preview-img" />
-									<button type="button" class="btn-remove-preview" onclick={() => removeFile(idx)} title="Supprimer">
-										✕
-									</button>
-								</div>
-							{/each}
+				<div class="modal-grid">
+					<div class="modal-column-attributes">
+						<div class="form-group">
+							<label class="form-label" for="projectName">Nom du projet *</label>
+							<input class="input-field" type="text" id="projectName" name="projectName" required />
 						</div>
-					{/if}
+						<div class="form-group">
+							<label class="form-label" for="clientId">Client *</label>
+							<select class="input-field" id="clientId" name="clientId" required>
+								<option value="" disabled selected>Sélectionner un client...</option>
+								{#each data.clients as client}
+									<option value={client.id}>{client.companyName}</option>
+								{/each}
+							</select>
+						</div>
+						<div class="form-group">
+							<label class="form-label" for="description">Description</label>
+							<textarea
+								class="input-field textarea-field"
+								id="description"
+								name="description"
+								rows="3"
+							></textarea>
+						</div>
+						<div class="form-row">
+							<div class="form-group">
+								<label class="form-label" for="statusProject">Statut</label>
+								<select class="input-field" id="statusProject" name="statusProject">
+									<option value="PLANNING">Planification</option>
+									<option value="ACTIVE">Actif</option>
+									<option value="ON_HOLD">En pause</option>
+									<option value="COMPLETED">Terminé</option>
+									<option value="CANCELLED">Annulé</option>
+								</select>
+							</div>
+							<div class="form-group">
+								<label class="form-label" for="priority">Priorité</label>
+								<select class="input-field" id="priority" name="priority">
+									<option value="LOW">Faible</option>
+									<option value="MEDIUM" selected>Moyen</option>
+									<option value="HIGH">Élevé</option>
+									<option value="URGENT">Urgent</option>
+								</select>
+							</div>
+						</div>
+						<div class="form-row">
+							<div class="form-group">
+								<label class="form-label" for="budgetAmount">Budget (DT)</label>
+								<input
+									class="input-field"
+									type="number"
+									step="0.01"
+									id="budgetAmount"
+									name="budgetAmount"
+									value="0"
+								/>
+							</div>
+							<div class="form-group">
+								<label class="form-label" for="reference">Référence</label>
+								<input
+									class="input-field"
+									type="text"
+									id="reference"
+									name="reference"
+									placeholder="ex. REF-2026-001"
+								/>
+							</div>
+						</div>
+						<div class="form-row">
+							<div class="form-group">
+								<label class="form-label" for="startDate">Date de début</label>
+								<input class="input-field" type="date" id="startDate" name="startDate" />
+							</div>
+							<div class="form-group">
+								<label class="form-label" for="dueDate">Date limite</label>
+								<input class="input-field" type="date" id="dueDate" name="dueDate" />
+							</div>
+						</div>
+					</div>
+
+					<div class="modal-column-upload">
+						<div class="form-group image-upload-section sticky-upload">
+							<label class="form-label">Images du projet</label>
+							<div class="image-upload-wrapper">
+								<label class="image-upload-dropzone">
+									<span class="upload-icon">📸</span>
+									<span class="upload-text">Glissez ou ajoutez des images</span>
+									<span class="upload-hint">PNG, JPG ou GIF</span>
+									<input
+										type="file"
+										name="images"
+										multiple
+										accept="image/*"
+										onchange={handleFileChange}
+										style="display: none;"
+									/>
+								</label>
+							</div>
+
+							{#if selectedImages.length > 0}
+								<div class="image-preview-grid">
+									{#each selectedImages as img, idx}
+										<div class="image-preview-card">
+											<img src={img.preview} alt="Aperçu" class="preview-img" />
+											<button
+												type="button"
+												class="btn-remove-preview"
+												onclick={() => removeFile(idx)}
+												title="Supprimer"
+											>
+												✕
+											</button>
+										</div>
+									{/each}
+								</div>
+							{/if}
+						</div>
+					</div>
 				</div>
 
 				<div class="modal-footer">
@@ -348,10 +378,9 @@
 	</div>
 {/if}
 
-<!-- EDIT PROJECT MODAL -->
 {#if showEditModal && selectedProject}
 	<div class="modal-backdrop">
-		<div class="modal glass-panel">
+		<div class="modal large-modal">
 			<div class="modal-header">
 				<h3>{data.readonly ? 'Détails du projet' : 'Modifier le projet'}</h3>
 				<button class="btn-close" onclick={() => (showEditModal = false)}>✕</button>
@@ -368,175 +397,182 @@
 			>
 				<input type="hidden" name="id" value={selectedProject.id} />
 
-				<!-- Champs en lecture seule -->
-				<div class="readonly-info">
-					<div class="readonly-row">
-						<span class="readonly-label">UUID</span>
-						<span class="readonly-value mono">{selectedProject.uuid}</span>
+				<div class="modal-grid">
+					<div class="modal-column-attributes">
+						<div class="readonly-info">
+							<div class="readonly-row">
+								<span class="readonly-label">UUID</span>
+								<span class="readonly-value mono">{selectedProject.uuid}</span>
+							</div>
+							<div class="readonly-row">
+								<span class="readonly-label">Créé par</span>
+								<span class="readonly-value">{selectedProject.createdBy || '—'}</span>
+							</div>
+							<div class="readonly-row">
+								<span class="readonly-label">Créé le</span>
+								<span class="readonly-value">{selectedProject.createdAt}</span>
+							</div>
+							<div class="readonly-row">
+								<span class="readonly-label">Modifié le</span>
+								<span class="readonly-value">{selectedProject.updatedAt}</span>
+							</div>
+						</div>
+
+						<div class="form-group">
+							<label class="form-label" for="edit_projectName">Nom du projet *</label>
+							<input
+								class="input-field"
+								type="text"
+								id="edit_projectName"
+								name="projectName"
+								bind:value={selectedProject.projectName}
+								required
+								disabled={data.readonly}
+							/>
+						</div>
+						<div class="form-group">
+							<label class="form-label" for="edit_clientId">Client *</label>
+							<select
+								class="input-field"
+								id="edit_clientId"
+								name="clientId"
+								bind:value={selectedProject.clientId}
+								required
+								disabled={data.readonly}
+							>
+								{#each data.clients as client}
+									<option value={client.id}>{client.companyName}</option>
+								{/each}
+							</select>
+						</div>
+						<div class="form-group">
+							<label class="form-label" for="edit_description">Description</label>
+							<textarea
+								class="input-field textarea-field"
+								id="edit_description"
+								name="description"
+								rows="3"
+								bind:value={selectedProject.description}
+								disabled={data.readonly}
+							></textarea>
+						</div>
 					</div>
-					<div class="readonly-row">
-						<span class="readonly-label">Créé par</span>
-						<span class="readonly-value">{selectedProject.createdBy || '—'}</span>
-					</div>
-					<div class="readonly-row">
-						<span class="readonly-label">Créé le</span>
-						<span class="readonly-value">{selectedProject.createdAt}</span>
-					</div>
-					<div class="readonly-row">
-						<span class="readonly-label">Modifié le</span>
-						<span class="readonly-value">{selectedProject.updatedAt}</span>
+
+					<div class="modal-column-upload">
+						<div class="form-row">
+							<div class="form-group">
+								<label class="form-label" for="edit_statusProject">Statut</label>
+								<select
+									class="input-field"
+									id="edit_statusProject"
+									name="statusProject"
+									bind:value={selectedProject.statusProject}
+									disabled={data.readonly}
+								>
+									<option value="PLANNING">Planification</option>
+									<option value="ACTIVE">Actif</option>
+									<option value="ON_HOLD">En pause</option>
+									<option value="COMPLETED">Terminé</option>
+									<option value="CANCELLED">Annulé</option>
+								</select>
+							</div>
+							<div class="form-group">
+								<label class="form-label" for="edit_priority">Priorité</label>
+								<select
+									class="input-field"
+									id="edit_priority"
+									name="priority"
+									bind:value={selectedProject.priority}
+									disabled={data.readonly}
+								>
+									<option value="LOW">Faible</option>
+									<option value="MEDIUM">Moyen</option>
+									<option value="HIGH">Élevé</option>
+									<option value="URGENT">Urgent</option>
+								</select>
+							</div>
+						</div>
+						<div class="form-row">
+							<div class="form-group">
+								<label class="form-label" for="edit_budgetAmount">Budget (DT)</label>
+								<input
+									class="input-field"
+									type="number"
+									step="0.01"
+									id="edit_budgetAmount"
+									name="budgetAmount"
+									bind:value={selectedProject.budgetAmount}
+									disabled={data.readonly}
+								/>
+							</div>
+							<div class="form-group">
+								<label class="form-label" for="edit_spentAmount">Dépensé (DT)</label>
+								<input
+									class="input-field"
+									type="number"
+									step="0.01"
+									id="edit_spentAmount"
+									name="spentAmount"
+									bind:value={selectedProject.spentAmount}
+									disabled={data.readonly}
+								/>
+							</div>
+						</div>
+						<div class="form-group">
+							<label class="form-label" for="edit_progressPercentage"
+								>Avancement ({selectedProject.progressPercentage}%)</label
+							>
+							<input
+								type="range"
+								class="input-field"
+								id="edit_progressPercentage"
+								name="progressPercentage"
+								min="0"
+								max="100"
+								bind:value={selectedProject.progressPercentage}
+								disabled={data.readonly}
+							/>
+						</div>
+						<div class="form-row">
+							<div class="form-group">
+								<label class="form-label" for="edit_reference">Référence</label>
+								<input
+									class="input-field"
+									type="text"
+									id="edit_reference"
+									name="reference"
+									bind:value={selectedProject.reference}
+									disabled={data.readonly}
+								/>
+							</div>
+						</div>
+						<div class="form-row">
+							<div class="form-group">
+								<label class="form-label" for="edit_startDate">Date de début</label>
+								<input
+									class="input-field"
+									type="date"
+									id="edit_startDate"
+									name="startDate"
+									bind:value={selectedProject.startDate}
+									disabled={data.readonly}
+								/>
+							</div>
+							<div class="form-group">
+								<label class="form-label" for="edit_dueDate">Date limite</label>
+								<input
+									class="input-field"
+									type="date"
+									id="edit_dueDate"
+									name="dueDate"
+									bind:value={selectedProject.dueDate}
+									disabled={data.readonly}
+								/>
+							</div>
+						</div>
 					</div>
 				</div>
 
-				<div class="form-group">
-					<label class="form-label" for="edit_projectName">Nom du projet *</label>
-					<input
-						class="input-field"
-						type="text"
-						id="edit_projectName"
-						name="projectName"
-						bind:value={selectedProject.projectName}
-						required
-						disabled={data.readonly}
-					/>
-				</div>
-				<div class="form-group">
-					<label class="form-label" for="edit_clientId">Client *</label>
-					<select
-						class="input-field"
-						id="edit_clientId"
-						name="clientId"
-						bind:value={selectedProject.clientId}
-						required
-						disabled={data.readonly}
-					>
-						{#each data.clients as client}
-							<option value={client.id}>{client.companyName}</option>
-						{/each}
-					</select>
-				</div>
-				<div class="form-group">
-					<label class="form-label" for="edit_description">Description</label>
-					<textarea
-						class="input-field textarea-field"
-						id="edit_description"
-						name="description"
-						rows="2"
-						bind:value={selectedProject.description}
-						disabled={data.readonly}
-					></textarea>
-				</div>
-				<div class="form-row">
-					<div class="form-group">
-						<label class="form-label" for="edit_statusProject">Statut</label>
-						<select
-							class="input-field"
-							id="edit_statusProject"
-							name="statusProject"
-							bind:value={selectedProject.statusProject}
-							disabled={data.readonly}
-						>
-							<option value="PLANNING">Planification</option>
-							<option value="ACTIVE">Actif</option>
-							<option value="ON_HOLD">En pause</option>
-							<option value="COMPLETED">Terminé</option>
-							<option value="CANCELLED">Annulé</option>
-						</select>
-					</div>
-					<div class="form-group">
-						<label class="form-label" for="edit_priority">Priorité</label>
-						<select
-							class="input-field"
-							id="edit_priority"
-							name="priority"
-							bind:value={selectedProject.priority}
-							disabled={data.readonly}
-						>
-							<option value="LOW">Faible</option>
-							<option value="MEDIUM">Moyen</option>
-							<option value="HIGH">Élevé</option>
-							<option value="URGENT">Urgent</option>
-						</select>
-					</div>
-				</div>
-				<div class="form-row">
-					<div class="form-group">
-						<label class="form-label" for="edit_budgetAmount">Budget (DT)</label>
-						<input
-							class="input-field"
-							type="number"
-							step="0.01"
-							id="edit_budgetAmount"
-							name="budgetAmount"
-							bind:value={selectedProject.budgetAmount}
-							disabled={data.readonly}
-						/>
-					</div>
-					<div class="form-group">
-						<label class="form-label" for="edit_spentAmount">Dépensé (DT)</label>
-						<input
-							class="input-field"
-							type="number"
-							step="0.01"
-							id="edit_spentAmount"
-							name="spentAmount"
-							bind:value={selectedProject.spentAmount}
-							disabled={data.readonly}
-						/>
-					</div>
-				</div>
-				<div class="form-group">
-					<label class="form-label" for="edit_progressPercentage"
-						>Avancement ({selectedProject.progressPercentage}%)</label
-					>
-					<input
-						type="range"
-						class="input-field"
-						id="edit_progressPercentage"
-						name="progressPercentage"
-						min="0"
-						max="100"
-						bind:value={selectedProject.progressPercentage}
-						disabled={data.readonly}
-					/>
-				</div>
-				<div class="form-row">
-					<div class="form-group">
-						<label class="form-label" for="edit_reference">Référence</label>
-						<input
-							class="input-field"
-							type="text"
-							id="edit_reference"
-							name="reference"
-							bind:value={selectedProject.reference}
-							disabled={data.readonly}
-						/>
-					</div>
-				</div>
-				<div class="form-row">
-					<div class="form-group">
-						<label class="form-label" for="edit_startDate">Date de début</label>
-						<input
-							class="input-field"
-							type="date"
-							id="edit_startDate"
-							name="startDate"
-							bind:value={selectedProject.startDate}
-							disabled={data.readonly}
-						/>
-					</div>
-					<div class="form-group">
-						<label class="form-label" for="edit_dueDate">Date limite</label>
-						<input
-							class="input-field"
-							type="date"
-							id="edit_dueDate"
-							name="dueDate"
-							bind:value={selectedProject.dueDate}
-							disabled={data.readonly}
-						/>
-					</div>
-				</div>
 				<div class="modal-footer">
 					<button type="button" class="btn btn-secondary" onclick={() => (showEditModal = false)}
 						>Fermer</button
@@ -551,16 +587,193 @@
 {/if}
 
 <style>
-	/* Image Upload & Preview styles */
-	.image-upload-section {
-		margin-top: 1.25rem;
+	/* --- Conteneurs Thème Clair Structurel --- */
+	.search-filter-bar {
+		background: var(--bg-secondary);
+		border: 1px solid var(--border-color);
+		border-radius: var(--radius-md);
+	}
+
+	.table-wrapper {
+		background: var(--bg-secondary);
+		border: 1px solid var(--border-color);
+		border-radius: var(--radius-md);
+		overflow: hidden;
+	}
+
+	/* --- Navigation Tabs --- */
+	.tabs {
+		display: flex;
+		gap: 0.5rem;
+		border-bottom: 1px solid var(--border-color);
+		padding-bottom: 0.5rem;
+	}
+
+	.tab-link {
+		padding: 0.5rem 1rem;
+		border-radius: var(--radius-sm);
+		color: var(--text-secondary);
+		font-weight: 600;
+		transition: all var(--transition);
+		text-decoration: none;
+		font-size: 0.95rem;
+	}
+
+	.tab-link:hover {
+		color: var(--text-primary);
+		background: var(--bg-secondary);
+	}
+
+	.tab-link.active {
+		background: rgba(79, 70, 229, 0.08);
+		color: var(--accent-color);
+		border: 1px solid rgba(79, 70, 229, 0.15);
+	}
+
+	.badge-total {
+		padding: 0.35rem 0.85rem;
+		border-radius: 100px;
+		background: var(--bg-secondary);
+		border: 1px solid var(--border-color);
+		font-size: 0.85rem;
+		color: var(--text-secondary);
+		font-weight: 600;
+	}
+
+	/* --- Data Table Modélisée --- */
+	.data-table {
+		width: 100%;
+		border-collapse: collapse;
+		text-align: left;
+		font-size: 0.92rem;
+	}
+
+	.data-table th {
+		background: #f8fafc;
+		padding: 1rem;
+		color: var(--text-secondary);
+		font-weight: 700;
+		border-bottom: 1px solid var(--border-color);
+		font-size: 0.82rem;
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
+	}
+
+	.data-table td {
+		padding: 1rem;
+		border-bottom: 1px solid var(--border-color);
+		color: var(--text-primary);
+		vertical-align: middle;
+	}
+
+	.data-table tr:last-child td {
+		border-bottom: none;
+	}
+
+	.project-name {
+		color: var(--text-primary);
+		font-size: 0.95rem;
+	}
+
+	.text-client {
+		color: var(--text-secondary);
+		font-weight: 500;
+	}
+
+	/* --- Modals Modernes --- */
+	.modal-backdrop {
+		position: fixed;
+		top: 0;
+		left: 0;
+		right: 0;
+		bottom: 0;
+		background: rgba(15, 23, 42, 0.3);
+		backdrop-filter: blur(6px);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		z-index: 1000;
+	}
+
+	.modal {
+		background: var(--bg-secondary);
+		border: 1px solid var(--border-color);
+		border-radius: var(--radius-md);
+		box-shadow:
+			0 20px 25px -5px rgba(0, 0, 0, 0.1),
+			0 10px 10px -5px rgba(0, 0, 0, 0.04);
+		padding: 1.75rem;
+		animation: modalSlideIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+	}
+
+	.large-modal {
+		width: 90% !important;
+		max-width: 950px !important;
+		max-height: 90vh;
+		display: flex;
+		flex-direction: column;
+	}
+
+	.large-modal form {
+		display: flex;
+		flex-direction: column;
+		overflow: hidden;
+		flex: 1;
+	}
+
+	.modal-grid {
+		display: grid;
+		grid-template-columns: 1.2fr 1fr;
+		gap: 2rem;
+		padding: 0.5rem 0;
+		overflow-y: auto;
+		flex: 1;
+	}
+
+	.modal-header {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
 		margin-bottom: 1.25rem;
+		border-bottom: 1px solid var(--border-color);
+		padding-bottom: 0.75rem;
+	}
+
+	.modal-header h3 {
+		font-size: 1.2rem;
+		font-weight: 800;
+		color: var(--text-primary);
+	}
+
+	.btn-close {
+		background: transparent;
+		border: none;
+		color: var(--text-secondary);
+		font-size: 1.15rem;
+		cursor: pointer;
+		transition: color 0.2s;
+	}
+
+	.btn-close:hover {
+		color: var(--text-primary);
+	}
+
+	.modal-column-attributes,
+	.modal-column-upload {
+		display: flex;
+		flex-direction: column;
+		gap: 0.75rem;
+	}
+
+	.sticky-upload {
+		position: relative;
+		height: 100%;
+		display: flex;
+		flex-direction: column;
 	}
 
 	.image-upload-wrapper {
-		display: flex;
-		flex-direction: column;
-		gap: 0.5rem;
+		flex: 0 0 auto;
 	}
 
 	.image-upload-dropzone {
@@ -568,17 +781,17 @@
 		flex-direction: column;
 		align-items: center;
 		justify-content: center;
-		padding: 1.5rem;
-		border: 2px dashed rgba(255, 255, 255, 0.15);
+		padding: 2.5rem 1.5rem;
+		border: 2px dashed #cbd5e1;
 		border-radius: var(--radius-sm);
-		background: rgba(255, 255, 255, 0.02);
+		background: #f8fafc;
 		cursor: pointer;
 		transition: all var(--transition);
 		text-align: center;
 	}
 
 	.image-upload-dropzone:hover {
-		background: rgba(255, 255, 255, 0.05);
+		background: #f1f5f9;
 		border-color: var(--accent-color);
 	}
 
@@ -589,7 +802,7 @@
 
 	.upload-text {
 		font-size: 0.95rem;
-		font-weight: 500;
+		font-weight: 600;
 		color: var(--text-primary);
 	}
 
@@ -604,10 +817,13 @@
 		grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
 		gap: 0.75rem;
 		margin-top: 1rem;
-		background: rgba(0, 0, 0, 0.2);
+		background: #f1f5f9;
 		padding: 0.75rem;
 		border-radius: var(--radius-sm);
 		border: 1px solid var(--border-color);
+		flex: 1;
+		overflow-y: auto;
+		min-height: 150px;
 	}
 
 	.image-preview-card {
@@ -616,7 +832,7 @@
 		aspect-ratio: 1;
 		border-radius: var(--radius-sm);
 		overflow: hidden;
-		border: 1px solid rgba(255, 255, 255, 0.1);
+		border: 1px solid var(--border-color);
 	}
 
 	.preview-img {
@@ -632,7 +848,7 @@
 		width: 20px;
 		height: 20px;
 		border-radius: 50%;
-		background: rgba(0, 0, 0, 0.6);
+		background: rgba(15, 23, 42, 0.75);
 		color: white;
 		border: none;
 		cursor: pointer;
@@ -640,21 +856,20 @@
 		align-items: center;
 		justify-content: center;
 		font-size: 0.75rem;
-		line-height: 1;
 		transition: background 0.2s;
 	}
 
 	.btn-remove-preview:hover {
-		background: rgba(239, 68, 68, 0.9);
+		background: #dc2626;
 	}
 
-	/* Readonly info block */
+	/* --- Readonly Block (Clair) --- */
 	.readonly-info {
-		background: rgba(255, 255, 255, 0.02);
+		background: #f8fafc;
 		border: 1px solid var(--border-color);
 		border-radius: var(--radius-sm);
 		padding: 0.75rem 1rem;
-		margin-bottom: 1.25rem;
+		margin-bottom: 0.5rem;
 		display: flex;
 		flex-direction: column;
 		gap: 0.4rem;
@@ -670,187 +885,34 @@
 	.readonly-label {
 		color: var(--text-secondary);
 		min-width: 90px;
-		font-weight: 500;
+		font-weight: 600;
 	}
 
 	.readonly-value {
 		color: var(--text-primary);
-		opacity: 0.75;
+		font-weight: 500;
 	}
 
 	.readonly-value.mono {
 		font-family: monospace;
+		background: #e2e8f0;
+		padding: 0.1rem 0.3rem;
+		border-radius: 4px;
 		font-size: 0.78rem;
-		word-break: break-all;
 	}
 
-	.tabs {
-		display: flex;
-		gap: 0.5rem;
-		border-bottom: 1px solid var(--border-color);
-		padding-bottom: 0.5rem;
-	}
-
-	.tab-link {
-		padding: 0.5rem 1rem;
-		border-radius: var(--radius-sm);
-		color: var(--text-secondary);
-		font-weight: 500;
-		transition: all var(--transition);
-	}
-
-	.tab-link:hover,
-	.tab-link.active {
-		color: var(--text-primary);
-		background: rgba(255, 255, 255, 0.05);
-	}
-
-	.tab-link.active {
-		background: rgba(99, 102, 241, 0.1);
-		color: var(--accent-color);
-		border: 1px solid rgba(99, 102, 241, 0.2);
-	}
-
-	.badge-total {
-		padding: 0.25rem 0.75rem;
-		border-radius: 100px;
-		background: rgba(255, 255, 255, 0.05);
-		border: 1px solid var(--border-color);
-		font-size: 0.85rem;
-		color: var(--text-secondary);
-	}
-
-	.page-header {
-		display: flex;
-		justify-content: space-between;
-		align-items: center;
-		margin-bottom: 2rem;
-	}
-
-	.text-secondary {
-		color: var(--text-secondary);
-	}
-
-	.text-center {
-		text-align: center;
-	}
-	.py-4 {
-		padding-top: 2rem;
-		padding-bottom: 2rem;
-	}
-	.fw-600 {
-		font-weight: 600;
-	}
-
-	.project-name {
-		color: var(--text-primary);
-		font-size: 1rem;
-	}
-
-	.text-client {
-		font-size: 0.95rem;
-		color: var(--text-primary);
-	}
-
-	.table-container {
-		overflow-x: auto;
-	}
-
-	.data-table {
-		width: 100%;
-		border-collapse: collapse;
-		text-align: left;
-	}
-
-	.data-table th,
-	.data-table td {
-		padding: 1rem 1.5rem;
-		border-bottom: 1px solid var(--border-color);
-		vertical-align: middle;
-	}
-
-	.data-table th {
-		font-size: 0.85rem;
-		text-transform: uppercase;
-		letter-spacing: 0.05em;
-		color: var(--text-secondary);
-		font-weight: 600;
-	}
-
-	.data-table tr:last-child td {
-		border-bottom: none;
-	}
-
-	.data-table tbody tr {
-		transition: background var(--transition);
-	}
-
-	.data-table tbody tr:hover {
-		background: rgba(255, 255, 255, 0.02);
-	}
-
-	.badge {
-		padding: 0.25rem 0.75rem;
-		border-radius: 100px;
-		font-size: 0.75rem;
-		font-weight: 600;
-		letter-spacing: 0.02em;
-		display: inline-block;
-		text-align: center;
-	}
-
-	/* Status Badges */
-	.badge-status-planning {
-		background: rgba(99, 102, 241, 0.15);
-		color: #a5b4fc;
-	}
-	.badge-status-active {
-		background: rgba(16, 185, 129, 0.15);
-		color: #6ee7b7;
-	}
-	.badge-status-on_hold {
-		background: rgba(245, 158, 11, 0.15);
-		color: #fcd34d;
-	}
-	.badge-status-completed {
-		background: rgba(59, 130, 246, 0.15);
-		color: #93c5fd;
-	}
-	.badge-status-cancelled {
-		background: rgba(107, 114, 128, 0.15);
-		color: #d1d5db;
-	}
-
-	/* Priority Badges */
-	.badge-priority-low {
-		background: rgba(156, 163, 175, 0.15);
-		color: #e5e7eb;
-	}
-	.badge-priority-medium {
-		background: rgba(59, 130, 246, 0.15);
-		color: #93c5fd;
-	}
-	.badge-priority-high {
-		background: rgba(245, 158, 11, 0.15);
-		color: #fcd34d;
-	}
-	.badge-priority-urgent {
-		background: rgba(239, 68, 68, 0.15);
-		color: #fca5a5;
-	}
-
-	/* Progress Bar */
+	/* --- Progress & Icons --- */
 	.progress-container {
 		display: flex;
 		align-items: center;
-		gap: 0.75rem;
-		min-width: 120px;
+		gap: 0.5rem;
+		min-width: 130px;
 	}
 
 	.progress-bar-wrapper {
 		flex: 1;
 		height: 6px;
-		background: rgba(255, 255, 255, 0.05);
+		background: #e2e8f0;
 		border-radius: 100px;
 		overflow: hidden;
 	}
@@ -858,108 +920,73 @@
 	.progress-bar {
 		height: 100%;
 		background: var(--accent-color);
-		box-shadow: 0 0 8px var(--accent-glow);
 		border-radius: 100px;
-		transition: width 0.4s ease;
 	}
 
 	.progress-text {
 		font-size: 0.8rem;
-		font-weight: 500;
-		color: var(--text-secondary);
+		font-weight: 700;
+		color: var(--text-primary);
 	}
 
-	/* Financials */
 	.financials {
 		display: flex;
 		flex-direction: column;
-		gap: 0.25rem;
+		gap: 0.15rem;
 	}
 
-	.budget {
-		font-weight: 600;
+	.financials .budget {
+		font-weight: 700;
 		color: var(--text-primary);
 	}
 
-	.spent {
-		font-size: 0.8rem;
+	.financials .spent {
+		font-size: 0.78rem;
 	}
 
-	/* Dates */
-	.dates {
+	.dates .date-range {
 		font-size: 0.85rem;
-		color: var(--text-primary);
+		font-weight: 500;
 	}
 
 	.actions-group {
 		display: flex;
-		gap: 0.5rem;
-		align-items: center;
+		gap: 0.35rem;
 	}
 
 	.btn-icon {
-		background: transparent;
-		border: none;
+		background: #f1f5f9;
+		border: 1px solid var(--border-color);
 		cursor: pointer;
-		font-size: 1.1rem;
-		padding: 0.4rem;
+		padding: 0.35rem;
 		border-radius: var(--radius-sm);
-		transition: all var(--transition);
-		opacity: 0.7;
-		display: inline-flex;
-		align-items: center;
-		justify-content: center;
+		transition: all 0.2s;
+		font-size: 0.9rem;
 	}
 
 	.btn-icon:hover {
-		opacity: 1;
-		background: rgba(255, 255, 255, 0.05);
+		background: #e2e8f0;
+		transform: translateY(-1px);
 	}
 
 	.btn-icon.danger:hover {
-		background: rgba(239, 68, 68, 0.1);
+		background: #fee2e2;
+		border-color: #fca5a5;
 	}
 
-	/* Form & Modal Extensions */
-	.form-row {
-		display: grid;
-		grid-template-columns: 1fr 1fr;
-		gap: 1rem;
-	}
-
-	.textarea-field {
-		resize: vertical;
-		font-family: var(--font-main);
-	}
-
-	/* Modal Styles */
-	.modal-backdrop {
-		position: fixed;
-		top: 0;
-		left: 0;
-		right: 0;
-		bottom: 0;
-		background: rgba(0, 0, 0, 0.6);
-		backdrop-filter: blur(4px);
+	.modal-footer {
 		display: flex;
-		align-items: center;
-		justify-content: center;
-		z-index: 1000;
-	}
-
-	.modal {
-		width: 100%;
-		max-width: 550px;
-		padding: 2rem;
-		max-height: 90vh;
-		overflow-y: auto;
-		animation: modalSlideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+		justify-content: flex-end;
+		gap: 0.75rem;
+		margin-top: 1.5rem;
+		border-top: 1px solid var(--border-color);
+		padding-top: 1rem;
 	}
 
 	@keyframes modalSlideIn {
 		from {
 			opacity: 0;
-			transform: translateY(20px) scale(0.95);
+			transform: translateY(12px) scale(0.98);
 		}
 		to {
 			opacity: 1;
@@ -967,33 +994,13 @@
 		}
 	}
 
-	.modal-header {
-		display: flex;
-		justify-content: space-between;
-		align-items: center;
-		margin-bottom: 1.5rem;
-		border-bottom: 1px solid var(--border-color);
-		padding-bottom: 0.75rem;
-	}
-
-	.btn-close {
-		background: transparent;
-		border: none;
-		color: var(--text-secondary);
-		font-size: 1.25rem;
-		cursor: pointer;
-	}
-
-	.btn-close:hover {
-		color: var(--text-primary);
-	}
-
-	.modal-footer {
-		display: flex;
-		justify-content: flex-end;
-		gap: 1rem;
-		margin-top: 2rem;
-		border-top: 1px solid var(--border-color);
-		padding-top: 1rem;
+	@media (max-width: 768px) {
+		.large-modal {
+			max-height: 95vh;
+		}
+		.modal-grid {
+			grid-template-columns: 1fr;
+			gap: 1.25rem;
+		}
 	}
 </style>
