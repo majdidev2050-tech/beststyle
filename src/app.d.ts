@@ -11,6 +11,7 @@ declare global {
 		interface Platform {
 			env: {
 				DB: import('@cloudflare/workers-types').D1Database;
+				BUCKET: import('@cloudflare/workers-types').R2Bucket;
 			};
 			context: {
 				waitUntil(promise: Promise<any>): void;

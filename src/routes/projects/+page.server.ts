@@ -1,8 +1,6 @@
 import { projects, clients, photosProjects } from '$lib/server/db/schema';
 import { eq, like, and, gte, lte } from 'drizzle-orm';
 import { fail, redirect } from '@sveltejs/kit';
-import * as fs from 'node:fs';
-import * as path from 'node:path';
 
 const isAdmin = (locals: App.Locals) => locals.user?.role === 'SUPER_ADMIN' || locals.user?.role === 'ADMIN';
 const isClientRole = (locals: App.Locals) => locals.user?.role === 'CLIENT';
@@ -88,7 +86,7 @@ export const load = async ({ locals, url }) => {
 };
 
 export const actions = {
-	create: async ({ request, locals }) => {
+	create: async ({ request, locals, platform }) => {
 		if (isClientRole(locals)) {
 			return fail(403, { forbidden: true });
 		}
@@ -140,18 +138,24 @@ export const actions = {
 
 		if (newProjectId) {
 			const files = data.getAll('images') as File[];
-			const uploadDir = path.join(process.cwd(), 'static', 'uploads');
-			if (!fs.existsSync(uploadDir)) {
-				fs.mkdirSync(uploadDir, { recursive: true });
-			}
+			const bucket = platform?.env?.BUCKET;
 
 			for (const file of files) {
 				if (file && file.size > 0 && file.name) {
 					const uniqueId = crypto.randomUUID();
 					const ext = file.name.split('.').pop();
 					const filename = `${uniqueId}.${ext}`;
-					const buffer = Buffer.from(await file.arrayBuffer());
-					fs.writeFileSync(path.join(uploadDir, filename), buffer);
+
+					if (bucket) {
+						const arrayBuffer = await file.arrayBuffer();
+						await bucket.put(filename, arrayBuffer, {
+							httpMetadata: {
+								contentType: file.type
+							}
+						});
+					} else {
+						console.warn('R2 Bucket not configured, skipping image upload');
+					}
 
 					await locals.db.insert(photosProjects).values({
 						id: crypto.randomUUID(),
