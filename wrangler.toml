@@ -6,7 +6,7 @@ pages_build_output_dir = ".svelte-kit/cloudflare"
 [[d1_databases]]
 binding = "DB"
 database_name = "beststyle_db"
-database_id = "local-dev" # Local dev doesn't need a real ID, we'll replace when deploying
+database_id = "6a9f6df9-1e0a-4c88-bfbe-682bce7dbf82" # Local dev doesn't need a real ID, we'll replace when deploying
 migrations_dir = "drizzle"
 
 [[r2_buckets]]
