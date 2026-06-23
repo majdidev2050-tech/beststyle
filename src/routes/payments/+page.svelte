@@ -133,7 +133,7 @@
 						<span class="project-name-text">{payment.projectName || '—'}</span>
 					</td>
 					<td>
-						<span class="amount-value">{payment.amount} DT</span>
+						<span class="amount-value">{(Number(payment.amount) || 0).toFixed(3)} DT</span>
 					</td>
 					<td>
 						<span class="badge-type">{payment.paymentType.replace('_', ' ')}</span>
@@ -238,7 +238,7 @@
 						<input
 							class="input-field"
 							type="number"
-							step="0.01"
+							step="0.001"
 							id="amount"
 							name="amount"
 							required
@@ -384,7 +384,7 @@
 						<input
 							class="input-field"
 							type="number"
-							step="0.01"
+							step="0.001"
 							id="edit_amount"
 							name="amount"
 							bind:value={selectedPayment.amount}

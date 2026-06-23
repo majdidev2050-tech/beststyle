@@ -228,11 +228,11 @@
           <div class="detail-grid">
             <div class="detail-item">
               <span class="detail-label">Budget alloué</span>
-              <span class="detail-value budget-val">{selectedProject.budgetAmount ?? 0} DT</span>
+              <span class="detail-value budget-val">{(Number(selectedProject.budgetAmount) || 0).toFixed(3)} DT</span>
             </div>
             <div class="detail-item">
               <span class="detail-label">Montant dépensé</span>
-              <span class="detail-value spent-val">{selectedProject.spentAmount ?? 0} DT</span>
+              <span class="detail-value spent-val">{(Number(selectedProject.spentAmount) || 0).toFixed(3)} DT</span>
             </div>
           </div>
         </div>

@@ -30,18 +30,43 @@ export const load = async ({ locals }) => {
 		.orderBy(asc(workflowProjects.position))
 		.all();
 
-	// 2. Bootstrap des workflows par défaut si vides
-	if (allWorkflows.length === 0) {
+	// 2. Bootstrap / migration des workflows par défaut si vides ou si anciens
+	const hasOldDefaults = allWorkflows.some(w => 
+		['BACKLOG', 'TODO', 'IN PROGRESS', 'IN REVIEW', 'DONE'].includes(w.workflowName)
+	);
+
+	if (allWorkflows.length === 0 || hasOldDefaults) {
+		if (hasOldDefaults) {
+			await locals.db.delete(workflowProjects);
+		}
+
 		const defaults = [
-			{ id: crypto.randomUUID(), position: 1, workflowName: 'BACKLOG' },
-			{ id: crypto.randomUUID(), position: 2, workflowName: 'TODO' },
-			{ id: crypto.randomUUID(), position: 3, workflowName: 'IN PROGRESS' },
-			{ id: crypto.randomUUID(), position: 4, workflowName: 'IN REVIEW' },
-			{ id: crypto.randomUUID(), position: 5, workflowName: 'DONE' }
+			{ id: crypto.randomUUID(), position: 1, workflowName: 'Nouveaux projets' },
+			{ id: crypto.randomUUID(), position: 2, workflowName: 'En cours' },
+			{ id: crypto.randomUUID(), position: 3, workflowName: 'À valider' },
+			{ id: crypto.randomUUID(), position: 4, workflowName: 'Impression' },
+			{ id: crypto.randomUUID(), position: 5, workflowName: 'Paiement' },
+			{ id: crypto.randomUUID(), position: 6, workflowName: 'Archives' }
 		];
 
 		for (const d of defaults) {
 			await locals.db.insert(workflowProjects).values(d);
+		}
+
+		// Migrer les projets existants ayant les anciens workflowName
+		const migrationMap: Record<string, string> = {
+			'BACKLOG': 'Nouveaux projets',
+			'TODO': 'Nouveaux projets',
+			'IN PROGRESS': 'En cours',
+			'IN REVIEW': 'À valider',
+			'DONE': 'Archives'
+		};
+
+		for (const [oldName, newName] of Object.entries(migrationMap)) {
+			await locals.db
+				.update(projects)
+				.set({ workflowName: newName })
+				.where(eq(projects.workflowName, oldName));
 		}
 
 		allWorkflows = await locals.db
@@ -135,7 +160,7 @@ export const actions = {
 			return fail(400, { missing: true });
 		}
 
-		const upperName = name.toUpperCase().trim();
+		const trimmedName = name.trim();
 
 		// Récupérer la position max pour ajouter à la fin
 		const currentWorkflows = await locals.db
@@ -149,7 +174,7 @@ export const actions = {
 		await locals.db.insert(workflowProjects).values({
 			id: crypto.randomUUID(),
 			position: nextPosition,
-			workflowName: upperName
+			workflowName: trimmedName
 		});
 
 		return { success: true };
@@ -167,7 +192,7 @@ export const actions = {
 			return fail(400, { missing: true });
 		}
 
-		const upperNewName = newName.toUpperCase().trim();
+		const trimmedNewName = newName.trim();
 
 		// Trouver l'ancien nom pour migrer les projets
 		const oldStep = await locals.db
@@ -180,13 +205,13 @@ export const actions = {
 			// Renommer l'étape
 			await locals.db
 				.update(workflowProjects)
-				.set({ workflowName: upperNewName })
+				.set({ workflowName: trimmedNewName })
 				.where(eq(workflowProjects.id, id));
 
 			// Mettre à jour tous les projets dans l'ancienne étape
 			await locals.db
 				.update(projects)
-				.set({ workflowName: upperNewName })
+				.set({ workflowName: trimmedNewName })
 				.where(eq(projects.workflowName, oldStep.workflowName));
 		}
 
@@ -280,10 +305,10 @@ export const actions = {
 		if (step) {
 			await locals.db.delete(workflowProjects).where(eq(workflowProjects.id, id));
 
-			// Remettre les projets de cette étape en 'BACKLOG'
+			// Remettre les projets de cette étape en 'Nouveaux projets'
 			await locals.db
 				.update(projects)
-				.set({ workflowName: 'BACKLOG' })
+				.set({ workflowName: 'Nouveaux projets' })
 				.where(eq(projects.workflowName, step.workflowName));
 		}
 

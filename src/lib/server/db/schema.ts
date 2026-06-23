@@ -62,7 +62,7 @@ export const projects = sqliteTable('projects', {
 	projectName: text('project_name').notNull(),
 	description: text('description'),
 	statusProject: text('status_project').notNull().default('PLANNING'),
-	workflowName: text('workflow_name').notNull().default('TODO'),
+	workflowName: text('workflow_name').notNull().default('Nouveaux projets'),
 	priority: text('priority').notNull().default('MEDIUM'),
 	budgetAmount: real('budget_amount').default(0),
 	spentAmount: real('spent_amount').default(0),

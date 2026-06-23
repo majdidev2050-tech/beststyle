@@ -7,11 +7,11 @@
 
 	// Form state
 
-	let search_text = $state(data.search_text || '');
+	let search_text = $state('');
 
-	let date_debut = $state(data.date_debut || '');
+	let date_debut = $state('');
 
-	let date_fin = $state(data.date_fin || '');
+	let date_fin = $state('');
 
 	$effect(() => {
 		search_text = data.search_text || '';

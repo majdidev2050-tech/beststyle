@@ -12,7 +12,7 @@
 	let renameValue = $state('');
 
 	// Optimistic updates for seamless transitions
-	let projectsList = $state(data.projects);
+	let projectsList = $state<any[]>([]);
 	$effect(() => {
 		projectsList = data.projects;
 	});
@@ -136,6 +136,8 @@
 
 				<div
 					class="kanban-column"
+					role="region"
+					aria-label={column.workflowName}
 					class:drag-over={activeDragOverWorkflowName === column.workflowName}
 					ondragover={(e) => handleDragOver(e, column.workflowName)}
 					ondragleave={() => (activeDragOverWorkflowName = null)}
@@ -155,6 +157,7 @@
 								class="rename-form"
 							>
 								<input type="hidden" name="id" value={column.id} />
+								<!-- svelte-ignore a11y_no_autofocus -->
 								<input
 									class="input-field rename-input"
 									type="text"
@@ -162,7 +165,6 @@
 									bind:value={renameValue}
 									required
 									autofocus
-									style="text-transform: uppercase;"
 								/>
 								<button type="submit" class="btn-action-check">✓</button>
 								<button type="button" class="btn-action-cancel" onclick={cancelRename}>✕</button>
@@ -170,6 +172,8 @@
 						{:else}
 							<div class="column-title-row">
 								<div class="column-header-info">
+									<!-- svelte-ignore a11y_click_events_have_key_events -->
+									<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 									<h3
 										onclick={() => startRename(column.id, column.workflowName)}
 										title="Cliquez pour renommer"
@@ -230,10 +234,11 @@
 						{/if}
 					</div>
 
-					<div class="cards-list">
+					<div class="cards-list" role="list">
 						{#each columnProjects as project}
 							<div
 								class="project-card"
+								role="listitem"
 								class:dragging={activeDragProjectId === project.id}
 								draggable="true"
 								ondragstart={(e) => handleDragStart(e, project.id)}
@@ -274,7 +279,7 @@
 
 								<div class="card-footer">
 									<div class="card-financials">
-										<span class="budget">{project.budgetAmount} DT</span>
+										<span class="budget">{(Number(project.budgetAmount) || 0).toFixed(3)} DT</span>
 									</div>
 									<div class="card-dates">
 										{#if project.dueDate}
@@ -323,7 +328,6 @@
 						name="workflowName"
 						placeholder="ex. RELEVE"
 						required
-						style="text-transform: uppercase;"
 					/>
 				</div>
 				<div class="modal-footer">
@@ -681,6 +685,7 @@
 		color: var(--text-secondary);
 		display: -webkit-box;
 		-webkit-line-clamp: 2;
+		line-clamp: 2;
 		-webkit-box-orient: vertical;
 		overflow: hidden;
 		margin-bottom: 0.75rem;

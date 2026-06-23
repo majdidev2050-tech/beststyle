@@ -75,11 +75,11 @@
           </div>
           <div class="meta-item">
             <span class="meta-label">Budget</span>
-            <span class="meta-value">{project.budgetAmount ?? 0} DT</span>
+            <span class="meta-value">{(Number(project.budgetAmount) || 0).toFixed(3)} DT</span>
           </div>
           <div class="meta-item">
             <span class="meta-label">Dépensé</span>
-            <span class="meta-value">{project.spentAmount ?? 0} DT</span>
+            <span class="meta-value">{(Number(project.spentAmount) || 0).toFixed(3)} DT</span>
           </div>
         </div>
 

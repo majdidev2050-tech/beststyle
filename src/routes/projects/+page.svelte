@@ -174,8 +174,8 @@
 					</td>
 					<td>
 						<div class="financials">
-							<span class="budget">{project.budgetAmount} €</span>
-							<span class="spent text-secondary">{project.spentAmount} € dépensé</span>
+							<span class="budget">{(Number(project.budgetAmount) || 0).toFixed(3)} DT</span>
+							<span class="spent text-secondary">{(Number(project.spentAmount) || 0).toFixed(3)} DT dépensé</span>
 						</div>
 					</td>
 					<td>
@@ -298,7 +298,7 @@
 								<input
 									class="input-field"
 									type="number"
-									step="0.01"
+									step="0.001"
 									id="budgetAmount"
 									name="budgetAmount"
 									value="0"
@@ -329,7 +329,7 @@
 
 					<div class="modal-column-upload">
 						<div class="form-group image-upload-section sticky-upload">
-							<label class="form-label">Images du projet</label>
+							<span class="form-label">Images du projet</span>
 							<div class="image-upload-wrapper">
 								<label class="image-upload-dropzone">
 									<span class="upload-icon">📸</span>
@@ -498,7 +498,7 @@
 								<input
 									class="input-field"
 									type="number"
-									step="0.01"
+									step="0.001"
 									id="edit_budgetAmount"
 									name="budgetAmount"
 									bind:value={selectedProject.budgetAmount}
@@ -510,7 +510,7 @@
 								<input
 									class="input-field"
 									type="number"
-									step="0.01"
+									step="0.001"
 									id="edit_spentAmount"
 									name="spentAmount"
 									bind:value={selectedProject.spentAmount}

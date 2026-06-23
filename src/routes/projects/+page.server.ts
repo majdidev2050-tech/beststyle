@@ -100,7 +100,7 @@ export const actions = {
 		const startDate = data.get('startDate')?.toString();
 		const dueDate = data.get('dueDate')?.toString();
 		const reference = data.get('reference')?.toString();
-		const workflowName = data.get('workflowName')?.toString() || 'TODO';
+		const workflowName = data.get('workflowName')?.toString() || 'Nouveaux projets';
 
 		if (!projectName || !clientId) {
 			return fail(400, { missing: true });
@@ -220,7 +220,7 @@ export const actions = {
 				description: description || null,
 				statusProject: statusProject || 'PLANNING',
 				priority: priority || 'MEDIUM',
-				workflowName: workflowName || 'TODO',
+				workflowName: workflowName || 'Nouveaux projets',
 				budgetAmount,
 				spentAmount,
 				progressPercentage,

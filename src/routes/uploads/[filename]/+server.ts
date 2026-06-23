@@ -18,11 +18,11 @@ export const GET: RequestHandler = async ({ params, platform }) => {
 	}
 
 	const headers = new Headers();
-	object.writeHttpMetadata(headers);
+	object.writeHttpMetadata(headers as any);
 	headers.set('etag', object.httpEtag);
 	headers.set('cache-control', 'public, max-age=31536000');
 
-	return new Response(object.body, {
+	return new Response(object.body as any, {
 		headers
 	});
 };
