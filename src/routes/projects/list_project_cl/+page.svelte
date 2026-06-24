@@ -11,10 +11,13 @@
   }
 
   const statusLabels: Record<string, string> = {
-    PLANNING: 'Planification',
-    ACTIVE: 'Actif',
-    ON_HOLD: 'En pause',
-    COMPLETED: 'Terminé',
+    NEW_PROJECT: 'Nouveau',
+    IN_PROGRESS: 'En cours',
+    PENDING_VALIDATION: 'À valider',
+    READY_TO_PRINT: 'Prêt à imprimer',
+    PRINTED: 'Imprimé',
+    DELIVERED: 'Livré',
+    PENDING_PAYMENT: 'En attente de paiement',
     CANCELLED: 'Annulé'
   };
 
@@ -33,9 +36,9 @@
 
   const stats = $derived({
     total: data.projects.length,
-    active: data.projects.filter((p: any) => p.statusProject === 'ACTIVE').length,
-    completed: data.projects.filter((p: any) => p.statusProject === 'COMPLETED').length,
-    planning: data.projects.filter((p: any) => p.statusProject === 'PLANNING').length,
+    active: data.projects.filter((p: any) => p.statusProject === 'IN_PROGRESS').length,
+    completed: data.projects.filter((p: any) => p.statusProject === 'DELIVERED').length,
+    planning: data.projects.filter((p: any) => p.statusProject === 'NEW_PROJECT').length,
   });
 </script>
 
@@ -64,17 +67,17 @@
     <div class="stat-number">{stats.total}</div>
     <div class="stat-label">Total projets</div>
   </button>
-  <button class="stat-card glass-panel {filterStatus === 'ACTIVE' ? 'stat-active' : ''}" onclick={() => filterStatus = 'ACTIVE'}>
+  <button class="stat-card glass-panel {filterStatus === 'IN_PROGRESS' ? 'stat-active' : ''}" onclick={() => filterStatus = 'IN_PROGRESS'}>
     <div class="stat-number active-num">{stats.active}</div>
     <div class="stat-label">En cours</div>
   </button>
-  <button class="stat-card glass-panel {filterStatus === 'PLANNING' ? 'stat-active' : ''}" onclick={() => filterStatus = 'PLANNING'}>
+  <button class="stat-card glass-panel {filterStatus === 'NEW_PROJECT' ? 'stat-active' : ''}" onclick={() => filterStatus = 'NEW_PROJECT'}>
     <div class="stat-number plan-num">{stats.planning}</div>
-    <div class="stat-label">En planification</div>
+    <div class="stat-label">Nouveau</div>
   </button>
-  <button class="stat-card glass-panel {filterStatus === 'COMPLETED' ? 'stat-active' : ''}" onclick={() => filterStatus = 'COMPLETED'}>
+  <button class="stat-card glass-panel {filterStatus === 'DELIVERED' ? 'stat-active' : ''}" onclick={() => filterStatus = 'DELIVERED'}>
     <div class="stat-number done-num">{stats.completed}</div>
-    <div class="stat-label">Terminés</div>
+    <div class="stat-label">Livrés</div>
   </button>
 </div>
 
@@ -195,10 +198,6 @@
                   {priorityLabels[selectedProject.priority] ?? selectedProject.priority}
                 </span>
               </span>
-            </div>
-            <div class="detail-item">
-              <span class="detail-label">Phase</span>
-              <span class="detail-value">{selectedProject.workflowName || '—'}</span>
             </div>
           </div>
 
@@ -406,10 +405,13 @@
     flex-shrink: 0;
   }
 
-  .status-planning { background: #a5b4fc; }
-  .status-active { background: #6ee7b7; }
-  .status-on_hold { background: #fcd34d; }
-  .status-completed { background: #93c5fd; }
+  .status-new_project { background: #6366f1; }
+  .status-in_progress { background: #f59e0b; }
+  .status-pending_validation { background: #10b981; }
+  .status-ready_to_print { background: #06b6d4; }
+  .status-printed { background: #3b82f6; }
+  .status-delivered { background: #10b981; }
+  .status-pending_payment { background: #ef4444; }
   .status-cancelled { background: #6b7280; }
 
   .project-body {
@@ -738,11 +740,14 @@
     white-space: nowrap;
   }
 
-  .badge-status-planning { background: rgba(99, 102, 241, 0.15); color: #a5b4fc; }
-  .badge-status-active { background: rgba(16, 185, 129, 0.15); color: #6ee7b7; }
-  .badge-status-on_hold { background: rgba(245, 158, 11, 0.15); color: #fcd34d; }
-  .badge-status-completed { background: rgba(59, 130, 246, 0.15); color: #93c5fd; }
-  .badge-status-cancelled { background: rgba(107, 114, 128, 0.15); color: #d1d5db; }
+  .badge-status-new_project { background: rgba(99, 102, 241, 0.15); color: #4f46e5; }
+  .badge-status-in_progress { background: rgba(245, 158, 11, 0.15); color: #d97706; }
+  .badge-status-pending_validation { background: rgba(16, 185, 129, 0.15); color: #059669; }
+  .badge-status-ready_to_print { background: rgba(6, 182, 212, 0.15); color: #0891b2; }
+  .badge-status-printed { background: rgba(59, 130, 246, 0.15); color: #2563eb; }
+  .badge-status-delivered { background: rgba(16, 185, 129, 0.15); color: #10b981; }
+  .badge-status-pending_payment { background: rgba(239, 68, 68, 0.15); color: #dc2626; }
+  .badge-status-cancelled { background: rgba(107, 114, 128, 0.15); color: #4b5563; }
 
   .badge-priority-low { background: rgba(156, 163, 175, 0.15); color: #e5e7eb; }
   .badge-priority-medium { background: rgba(59, 130, 246, 0.15); color: #93c5fd; }

@@ -1,15 +1,8 @@
 <script lang="ts">
-	import { enhance } from '$app/forms';
-
 	let { data } = $props();
 
-	let showAddColumnModal = $state(false);
 	let activeDragProjectId = $state<string | number | null>(null);
 	let activeDragOverWorkflowName = $state<string | null>(null);
-
-	// Column renaming state
-	let editingColumnId = $state<string | null>(null);
-	let renameValue = $state('');
 
 	// Optimistic updates for seamless transitions
 	let projectsList = $state<any[]>([]);
@@ -31,14 +24,14 @@
 		activeDragOverWorkflowName = null;
 	}
 
-	function handleDragOver(e: DragEvent, workflowName: string) {
+	function handleDragOver(e: DragEvent, statusId: string) {
 		e.preventDefault();
-		if (activeDragOverWorkflowName !== workflowName) {
-			activeDragOverWorkflowName = workflowName;
+		if (activeDragOverWorkflowName !== statusId) {
+			activeDragOverWorkflowName = statusId;
 		}
 	}
 
-	async function handleDrop(e: DragEvent, workflowName: string) {
+	async function handleDrop(e: DragEvent, statusId: string) {
 		e.preventDefault();
 		const projectIdStr = e.dataTransfer?.getData('text/plain');
 		const projectId = projectIdStr ? parseInt(projectIdStr) : activeDragProjectId;
@@ -47,7 +40,7 @@
 			// Optimistically update status in local UI state
 			projectsList = projectsList.map((p) => {
 				if (p.id.toString() === projectId.toString()) {
-					return { ...p, workflowName };
+					return { ...p, statusProject: statusId };
 				}
 				return p;
 			});
@@ -55,7 +48,7 @@
 			// Send to server
 			const formData = new FormData();
 			formData.append('projectId', projectId.toString());
-			formData.append('workflowName', workflowName);
+			formData.append('workflowName', statusId); // Using the same server action key for simplicity
 
 			try {
 				await fetch('?/updateProjectStep', {
@@ -63,7 +56,7 @@
 					body: formData
 				});
 			} catch (err) {
-				console.error('Failed to sync workflow step change to server:', err);
+				console.error('Failed to sync project status change to server:', err);
 			}
 		}
 
@@ -72,17 +65,17 @@
 	}
 
 	// Handle dropdown selection change directly
-	async function handleDropdownChange(projectId: string | number, workflowName: string) {
+	async function handleDropdownChange(projectId: string | number, statusId: string) {
 		projectsList = projectsList.map((p) => {
 			if (p.id.toString() === projectId.toString()) {
-				return { ...p, workflowName };
+				return { ...p, statusProject: statusId };
 			}
 			return p;
 		});
 
 		const formData = new FormData();
 		formData.append('projectId', projectId.toString());
-		formData.append('workflowName', workflowName);
+		formData.append('workflowName', statusId);
 
 		try {
 			await fetch('?/updateProjectStep', {
@@ -90,18 +83,8 @@
 				body: formData
 			});
 		} catch (err) {
-			console.error('Failed to sync workflow step change to server:', err);
+			console.error('Failed to sync project status change to server:', err);
 		}
-	}
-
-	function startRename(columnId: string, name: string) {
-		editingColumnId = columnId;
-		renameValue = name;
-	}
-
-	function cancelRename() {
-		editingColumnId = null;
-		renameValue = '';
 	}
 </script>
 
@@ -109,7 +92,7 @@
 	<div class="projects-navigation">
 		<h1 class="page-title" style="margin-bottom: 0.25rem;">Tableau des projets</h1>
 		<p class="text-secondary" style="margin-bottom: 1.5rem;">
-			Suivez, déplacez et configurez les étapes de votre flux de travail.
+			Suivez et déplacez vos projets à travers les différentes étapes de production.
 		</p>
 
 		<div class="tabs">
@@ -124,114 +107,29 @@
 				>{projectsList.length} projet{projectsList.length > 1 ? 's' : ''} au total</span
 			>
 		</div>
-		<button class="btn btn-secondary" onclick={() => (showAddColumnModal = true)}>
-			+ Ajouter une colonne
-		</button>
 	</div>
 
 	<div class="kanban-board-wrapper">
 		<div class="kanban-board">
 			{#each data.workflows as column, i}
-				{@const columnProjects = projectsList.filter((p) => p.workflowName === column.workflowName)}
+				{@const columnProjects = projectsList.filter((p) => p.statusProject === column.id)}
 
 				<div
 					class="kanban-column"
 					role="region"
 					aria-label={column.workflowName}
-					class:drag-over={activeDragOverWorkflowName === column.workflowName}
-					ondragover={(e) => handleDragOver(e, column.workflowName)}
+					class:drag-over={activeDragOverWorkflowName === column.id}
+					ondragover={(e) => handleDragOver(e, column.id)}
 					ondragleave={() => (activeDragOverWorkflowName = null)}
-					ondrop={(e) => handleDrop(e, column.workflowName)}
+					ondrop={(e) => handleDrop(e, column.id)}
 				>
 					<div class="column-header">
-						{#if editingColumnId === column.id}
-							<form
-								method="POST"
-								action="?/renameWorkflowStep"
-								use:enhance={() => {
-									return async ({ update }) => {
-										await update();
-										editingColumnId = null;
-									};
-								}}
-								class="rename-form"
-							>
-								<input type="hidden" name="id" value={column.id} />
-								<!-- svelte-ignore a11y_no_autofocus -->
-								<input
-									class="input-field rename-input"
-									type="text"
-									name="workflowName"
-									bind:value={renameValue}
-									required
-									autofocus
-								/>
-								<button type="submit" class="btn-action-check">✓</button>
-								<button type="button" class="btn-action-cancel" onclick={cancelRename}>✕</button>
-							</form>
-						{:else}
-							<div class="column-title-row">
-								<div class="column-header-info">
-									<!-- svelte-ignore a11y_click_events_have_key_events -->
-									<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-									<h3
-										onclick={() => startRename(column.id, column.workflowName)}
-										title="Cliquez pour renommer"
-										class="clickable-header"
-									>
-										{column.workflowName}
-									</h3>
-									<span class="count-badge">{columnProjects.length}</span>
-								</div>
-
-								<div class="column-actions">
-									<form
-										method="POST"
-										action="?/moveWorkflowStep"
-										use:enhance
-										style="display:inline;"
-									>
-										<input type="hidden" name="id" value={column.id} />
-										<input type="hidden" name="direction" value="left" />
-										<button class="btn-column-control" disabled={i === 0} title="Déplacer à gauche"
-											>◀</button
-										>
-									</form>
-
-									<form
-										method="POST"
-										action="?/moveWorkflowStep"
-										use:enhance
-										style="display:inline;"
-									>
-										<input type="hidden" name="id" value={column.id} />
-										<input type="hidden" name="direction" value="right" />
-										<button
-											class="btn-column-control"
-											disabled={i === data.workflows.length - 1}
-											title="Déplacer à droite">▶</button
-										>
-									</form>
-
-									<button
-										class="btn-column-control"
-										onclick={() => startRename(column.id, column.workflowName)}
-										title="Renommer l'étape">✏️</button
-									>
-
-									<form
-										method="POST"
-										action="?/deleteWorkflowStep"
-										use:enhance
-										style="display:inline;"
-									>
-										<input type="hidden" name="id" value={column.id} />
-										<button class="btn-column-control danger" title="Supprimer la colonne">✕</button
-										>
-									</form>
-								</div>
+						<div class="column-title-row">
+							<div class="column-header-info">
+								<h3>{column.workflowName}</h3>
+								<span class="count-badge">{columnProjects.length}</span>
 							</div>
-						{/if}
+						</div>
 					</div>
 
 					<div class="cards-list" role="list">
@@ -251,11 +149,11 @@
 
 									<select
 										class="status-dropdown"
-										value={project.workflowName}
+										value={project.statusProject}
 										onchange={(e: any) => handleDropdownChange(project.id, e.target.value)}
 									>
 										{#each data.workflows as w}
-											<option value={w.workflowName}>{w.workflowName}</option>
+											<option value={w.id}>{w.workflowName}</option>
 										{/each}
 									</select>
 								</div>
@@ -302,47 +200,6 @@
 	</div>
 </div>
 
-{#if showAddColumnModal}
-	<div class="modal-backdrop">
-		<div class="modal">
-			<div class="modal-header">
-				<h3>Ajouter une colonne</h3>
-				<button class="btn-close" onclick={() => (showAddColumnModal = false)}>✕</button>
-			</div>
-			<form
-				method="POST"
-				action="?/createWorkflowStep"
-				use:enhance={() => {
-					return async ({ update }) => {
-						await update();
-						showAddColumnModal = false;
-					};
-				}}
-			>
-				<div class="form-group">
-					<label class="form-label" for="workflowName">Nom de la colonne *</label>
-					<input
-						class="input-field"
-						type="text"
-						id="workflowName"
-						name="workflowName"
-						placeholder="ex. RELEVE"
-						required
-					/>
-				</div>
-				<div class="modal-footer">
-					<button
-						type="button"
-						class="btn btn-secondary"
-						onclick={() => (showAddColumnModal = false)}>Annuler</button
-					>
-					<button type="submit" class="btn btn-primary">Créer la colonne</button>
-				</div>
-			</form>
-		</div>
-	</div>
-{/if}
-
 <style>
 	/* --- Ajusté pour occuper 100% de la largeur du Layout à droite --- */
 	.projects-container {
@@ -350,7 +207,7 @@
 		flex-direction: column;
 		height: calc(100vh - 4rem);
 		width: 100%;
-		padding: 2rem 2.5rem; /* Même padding que vos autres pages pour un alignement au pixel près */
+		padding: 2rem 2.5rem;
 		box-sizing: border-box;
 	}
 
@@ -465,15 +322,7 @@
 		font-weight: 700;
 		letter-spacing: 0.05em;
 		color: var(--text-primary);
-	}
-
-	.clickable-header {
-		cursor: pointer;
-		transition: color 0.2s;
-	}
-
-	.clickable-header:hover {
-		color: var(--accent-color);
+		margin: 0;
 	}
 
 	.count-badge {
@@ -483,79 +332,6 @@
 		border-radius: 100px;
 		background: #cbd5e1;
 		color: #334155;
-	}
-
-	.column-actions {
-		display: flex;
-		gap: 0.15rem;
-		align-items: center;
-	}
-
-	.btn-column-control {
-		background: transparent;
-		border: none;
-		cursor: pointer;
-		color: var(--text-secondary);
-		font-size: 0.75rem;
-		opacity: 0.6;
-		transition: all var(--transition);
-		padding: 0.25rem;
-		border-radius: 4px;
-	}
-
-	.btn-column-control:hover:not(:disabled) {
-		opacity: 1;
-		background: rgba(0, 0, 0, 0.05);
-		color: var(--text-primary);
-	}
-
-	.btn-column-control.danger:hover {
-		color: var(--danger-color);
-		background: rgba(239, 68, 68, 0.1);
-	}
-
-	.btn-column-control:disabled {
-		opacity: 0.15;
-		cursor: not-allowed;
-	}
-
-	/* Rename Form */
-	.rename-form {
-		display: flex;
-		gap: 0.35rem;
-		align-items: center;
-		width: 100%;
-	}
-
-	.rename-input {
-		padding: 0.25rem 0.5rem;
-		font-size: 0.85rem;
-		height: 32px;
-	}
-
-	.btn-action-check,
-	.btn-action-cancel {
-		background: transparent;
-		border: none;
-		font-size: 0.95rem;
-		cursor: pointer;
-		padding: 0.25rem;
-		border-radius: 4px;
-		transition: background 0.2s;
-	}
-
-	.btn-action-check {
-		color: var(--success-color);
-	}
-	.btn-action-check:hover {
-		background: rgba(16, 185, 129, 0.1);
-	}
-
-	.btn-action-cancel {
-		color: var(--text-secondary);
-	}
-	.btn-action-cancel:hover {
-		background: rgba(0, 0, 0, 0.05);
 	}
 
 	/* Cards list */
@@ -655,7 +431,7 @@
 		padding: 0.15rem 0.35rem;
 		cursor: pointer;
 		font-weight: 600;
-		max-width: 120px;
+		max-width: 140px;
 		outline: none;
 	}
 
@@ -756,77 +532,5 @@
 		font-size: 0.82rem;
 		pointer-events: none;
 		background: rgba(255, 255, 255, 0.4);
-	}
-
-	/* Modal Core Layout */
-	.modal-backdrop {
-		position: fixed;
-		top: 0;
-		left: 0;
-		right: 0;
-		bottom: 0;
-		background: rgba(15, 23, 42, 0.3);
-		backdrop-filter: blur(6px);
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		z-index: 1000;
-	}
-
-	.modal {
-		background: var(--bg-secondary);
-		width: 100%;
-		max-width: 440px;
-		padding: 1.75rem;
-		border: 1px solid var(--border-color);
-		border-radius: var(--radius-md);
-		box-shadow:
-			0 20px 25px -5px rgba(0, 0, 0, 0.1),
-			0 10px 10px -5px rgba(0, 0, 0, 0.04);
-		animation: modalSlideIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
-	}
-
-	@keyframes modalSlideIn {
-		from {
-			opacity: 0;
-			transform: translateY(12px) scale(0.98);
-		}
-		to {
-			opacity: 1;
-			transform: translateY(0) scale(1);
-		}
-	}
-
-	.modal-header {
-		display: flex;
-		justify-content: space-between;
-		align-items: center;
-		margin-bottom: 1.25rem;
-	}
-
-	.modal-header h3 {
-		font-size: 1.15rem;
-		font-weight: 800;
-		color: var(--text-primary);
-	}
-
-	.btn-close {
-		background: transparent;
-		border: none;
-		color: var(--text-secondary);
-		font-size: 1.15rem;
-		cursor: pointer;
-		transition: color 0.2s;
-	}
-
-	.btn-close:hover {
-		color: var(--text-primary);
-	}
-
-	.modal-footer {
-		display: flex;
-		justify-content: flex-end;
-		gap: 0.75rem;
-		margin-top: 1.75rem;
 	}
 </style>

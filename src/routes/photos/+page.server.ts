@@ -1,7 +1,7 @@
 import { error } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 import { photosProjects, projects } from '$lib/server/db/schema';
-import { eq, like, gte, lte, and } from 'drizzle-orm';
+import { eq, gte, lte, and, sql } from 'drizzle-orm';
 
 export const load: PageServerLoad = async ({ locals, url }) => {
   // Validate authentication
@@ -18,7 +18,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
     const conditions = [];
 
     if (search_text) {
-      conditions.push(like(projects.searchText, `%${search_text}%`));
+      conditions.push(sql`projects.id IN (SELECT rowid FROM projects_fts WHERE projects_fts MATCH ${search_text + '*'})`);
     }
 
     if (date_debut) {

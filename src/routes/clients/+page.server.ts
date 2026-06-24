@@ -1,23 +1,8 @@
-import { clients } from '$lib/server/db/schema';
-import { eq, like, and, or } from 'drizzle-orm';
+import { clients, clientUserAccess } from '$lib/server/db/schema';
+import { eq, and, or, sql, inArray } from 'drizzle-orm';
 import { fail } from '@sveltejs/kit';
 
 const isAdmin = (locals: App.Locals) => locals.user?.role === 'SUPER_ADMIN' || locals.user?.role === 'ADMIN';
-
-const matchesUserAccess = (usersAccessVal: string | null | undefined, userName: string) => {
-	if (!usersAccessVal) return false;
-	const trimmed = usersAccessVal.trim();
-	if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
-		try {
-			const parsed = JSON.parse(trimmed);
-			if (Array.isArray(parsed)) {
-				return parsed.map(p => p.toString().toLowerCase()).includes(userName.toLowerCase());
-			}
-		} catch (e) {}
-	}
-	const parts = trimmed.split(/[\s,;]+/).map(p => p.trim().toLowerCase());
-	return parts.includes(userName.toLowerCase());
-};
 
 export const load = async ({ locals, url }) => {
 	const userName = locals.user?.userName || '';
@@ -26,27 +11,50 @@ export const load = async ({ locals, url }) => {
 
 	const conditions = [];
 	if (searchText) {
-		conditions.push(like(clients.searchText, `%${searchText}%`));
+		conditions.push(sql`clients.id IN (SELECT rowid FROM clients_fts WHERE clients_fts MATCH ${searchText + '*'})`);
 	}
 	if (!admin) {
-		conditions.push(
-			or(
-				eq(clients.createdBy, userName),
-				like(clients.usersAccess, `%${userName}%`)
-			)
-		);
+		// Non-admin : ne voir que les clients créés par soi ou auxquels on a accès
+		const accessRows = await locals.db
+			.select({ clientId: clientUserAccess.clientId })
+			.from(clientUserAccess)
+			.where(eq(clientUserAccess.userName, userName))
+			.all();
+		const accessibleIds = accessRows.map(r => r.clientId);
+
+		if (accessibleIds.length > 0) {
+			conditions.push(
+				or(
+					eq(clients.createdBy, userName),
+					inArray(clients.id, accessibleIds)
+				)
+			);
+		} else {
+			conditions.push(eq(clients.createdBy, userName));
+		}
 	}
 
-	const rawClients = await (conditions.length > 0
+	const allClients = await (conditions.length > 0
 		? locals.db.select().from(clients).where(and(...conditions)).limit(100).all()
 		: locals.db.select().from(clients).limit(100).all());
 
-	const allClients = admin
-		? rawClients
-		: rawClients.filter(c => matchesUserAccess(c.usersAccess, userName));
+	// Récupérer les accès utilisateurs pour chaque client afin de reconstituer le champ pour l'UI
+	const allAccess = await locals.db.select().from(clientUserAccess).all();
+	const accessMap = new Map<number, string[]>();
+	for (const row of allAccess) {
+		if (!accessMap.has(row.clientId)) {
+			accessMap.set(row.clientId, []);
+		}
+		accessMap.get(row.clientId)!.push(row.userName);
+	}
+
+	const clientsWithAccess = allClients.map(c => ({
+		...c,
+		usersAccess: accessMap.get(c.id)?.join(', ') || ''
+	}));
 
 	return {
-		clients: allClients,
+		clients: clientsWithAccess,
 		readonly: !admin,
 		searchText
 	};
@@ -73,7 +81,7 @@ export const actions = {
 			return fail(400, { missing: true });
 		}
 
-		await locals.db.insert(clients).values({
+		const inserted = await locals.db.insert(clients).values({
 			uuid: crypto.randomUUID(),
 			companyName,
 			contactName: contactName || null,
@@ -84,9 +92,20 @@ export const actions = {
 			billingAddress: billingAddress || null,
 			vatNumber: vatNumber || null,
 			notes: notes || null,
-			usersAccess: usersAccess || null,
-			createdBy: locals.user?.userName || null
-		});
+			createdBy: locals.user?.userName || ''
+		}).returning({ id: clients.id });
+
+		// Sauvegarder les accès utilisateurs dans la table de liaison
+		const newClientId = inserted[0]?.id;
+		if (newClientId && usersAccess) {
+			const userNames = usersAccess.split(/[\s,;]+/).map(u => u.trim()).filter(Boolean);
+			for (const uName of userNames) {
+				await locals.db.insert(clientUserAccess).values({
+					clientId: newClientId,
+					userName: uName
+				});
+			}
+		}
 
 		return { success: true };
 	},
@@ -119,7 +138,6 @@ export const actions = {
 			billingAddress: billingAddress || null,
 			vatNumber: vatNumber || null,
 			notes: notes || null,
-			usersAccess: usersAccess || null,
 			updatedAt: new Date().toISOString()
 		};
 
@@ -136,6 +154,18 @@ export const actions = {
 			.set(updateData)
 			.where(eq(clients.id, id));
 
+		// Mettre à jour les accès utilisateurs : supprimer puis recréer
+		await locals.db.delete(clientUserAccess).where(eq(clientUserAccess.clientId, id));
+		if (usersAccess) {
+			const userNames = usersAccess.split(/[\s,;]+/).map(u => u.trim()).filter(Boolean);
+			for (const uName of userNames) {
+				await locals.db.insert(clientUserAccess).values({
+					clientId: id,
+					userName: uName
+				});
+			}
+		}
+
 		return { success: true };
 	},
 	delete: async ({ request, locals }) => {
@@ -149,6 +179,7 @@ export const actions = {
 			return fail(400, { missing: true });
 		}
 
+		// Les accès seront supprimés en cascade grâce à ON DELETE CASCADE
 		await locals.db.delete(clients).where(eq(clients.id, id));
 		return { success: true };
 	}

@@ -1,5 +1,5 @@
 import { projects, clients, photosProjects } from '$lib/server/db/schema';
-import { eq, like, and, gte, lte } from 'drizzle-orm';
+import { eq, and, gte, lte, sql } from 'drizzle-orm';
 import { fail, redirect } from '@sveltejs/kit';
 
 const isAdmin = (locals: App.Locals) => locals.user?.role === 'SUPER_ADMIN' || locals.user?.role === 'ADMIN';
@@ -30,7 +30,7 @@ export const load = async ({ locals, url }) => {
 
 	const conditions = [];
 	if (searchText) {
-		conditions.push(like(projects.searchText, `%${searchText}%`));
+		conditions.push(sql`projects.id IN (SELECT rowid FROM projects_fts WHERE projects_fts MATCH ${searchText + '*'})`);
 	}
 	if (dateDebut) {
 		conditions.push(gte(projects.startDate, dateDebut));
@@ -53,13 +53,12 @@ export const load = async ({ locals, url }) => {
 			description: projects.description,
 			statusProject: projects.statusProject,
 			priority: projects.priority,
-			budgetAmount: projects.budgetAmount,
-			spentAmount: projects.spentAmount,
+			budgetAmountCents: projects.budgetAmountCents,
+			spentAmountCents: projects.spentAmountCents,
 			progressPercentage: projects.progressPercentage,
 			startDate: projects.startDate,
 			dueDate: projects.dueDate,
 			completedAt: projects.completedAt,
-			workflowName: projects.workflowName,
 			reference: projects.reference,
 			userName: projects.userName,
 			clientId: projects.clientId,
@@ -71,9 +70,16 @@ export const load = async ({ locals, url }) => {
 		.from(projects)
 		.leftJoin(clients, eq(projects.clientId, clients.id));
 
-	const allProjects = await (conditions.length > 0
+	const rawProjects = await (conditions.length > 0
 		? baseQuery.where(and(...conditions)).limit(100).all()
 		: baseQuery.limit(100).all());
+
+	// Convertir cents → décimaux pour l'UI
+	const allProjects = rawProjects.map(p => ({
+		...p,
+		budgetAmount: (p.budgetAmountCents || 0) / 1000,
+		spentAmount: (p.spentAmountCents || 0) / 1000
+	}));
 
 	return {
 		projects: allProjects,
@@ -94,13 +100,12 @@ export const actions = {
 		const projectName = data.get('projectName')?.toString();
 		const clientId = parseInt(data.get('clientId')?.toString() || '0');
 		const description = data.get('description')?.toString();
-		const statusProject = data.get('statusProject')?.toString() || 'PLANNING';
+		const statusProject = data.get('statusProject')?.toString() || 'NEW_PROJECT';
 		const priority = data.get('priority')?.toString() || 'MEDIUM';
 		const budgetAmount = parseFloat(data.get('budgetAmount')?.toString() || '0');
 		const startDate = data.get('startDate')?.toString();
 		const dueDate = data.get('dueDate')?.toString();
 		const reference = data.get('reference')?.toString();
-		const workflowName = data.get('workflowName')?.toString() || 'Nouveaux projets';
 
 		if (!projectName || !clientId) {
 			return fail(400, { missing: true });
@@ -123,9 +128,8 @@ export const actions = {
 			description: description || null,
 			statusProject,
 			priority,
-			workflowName,
-			budgetAmount,
-			spentAmount: 0,
+			budgetAmountCents: Math.round(budgetAmount * 1000),
+			spentAmountCents: 0,
 			progressPercentage: 0,
 			startDate: startDate || null,
 			dueDate: dueDate || null,
@@ -160,7 +164,6 @@ export const actions = {
 					await locals.db.insert(photosProjects).values({
 						id: crypto.randomUUID(),
 						projectId: newProjectId,
-						projectName: projectName,
 						filename: file.name,
 						description: description || null,
 						r2Key: filename,
@@ -183,7 +186,6 @@ export const actions = {
 		const description = data.get('description')?.toString();
 		const statusProject = data.get('statusProject')?.toString();
 		const priority = data.get('priority')?.toString();
-		const workflowName = data.get('workflowName')?.toString();
 		const budgetAmount = parseFloat(data.get('budgetAmount')?.toString() || '0');
 		const spentAmount = parseFloat(data.get('spentAmount')?.toString() || '0');
 		const progressPercentage = parseInt(data.get('progressPercentage')?.toString() || '0');
@@ -218,11 +220,10 @@ export const actions = {
 				contactEmail: client.contactEmail || null,
 				projectName,
 				description: description || null,
-				statusProject: statusProject || 'PLANNING',
+				statusProject: statusProject || 'NEW_PROJECT',
 				priority: priority || 'MEDIUM',
-				workflowName: workflowName || 'Nouveaux projets',
-				budgetAmount,
-				spentAmount,
+				budgetAmountCents: Math.round(budgetAmount * 1000),
+				spentAmountCents: Math.round(spentAmount * 1000),
 				progressPercentage,
 				startDate: startDate || null,
 				dueDate: dueDate || null,

@@ -1,82 +1,26 @@
-import { workflowProjects, projects, clients } from '$lib/server/db/schema';
-import { eq, asc, lt, gt } from 'drizzle-orm';
+import { projects, clients, clientUserAccess } from '$lib/server/db/schema';
+import { eq, inArray } from 'drizzle-orm';
 import { fail } from '@sveltejs/kit';
 
 const isAdmin = (locals: App.Locals) => locals.user?.role === 'SUPER_ADMIN' || locals.user?.role === 'ADMIN';
-
-const matchesUserAccess = (usersAccessVal: string | null | undefined, userName: string) => {
-	if (!usersAccessVal) return false;
-	const trimmed = usersAccessVal.trim();
-	if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
-		try {
-			const parsed = JSON.parse(trimmed);
-			if (Array.isArray(parsed)) {
-				return parsed.map(p => p.toString().toLowerCase()).includes(userName.toLowerCase());
-			}
-		} catch (e) {}
-	}
-	const parts = trimmed.split(/[\s,;]+/).map(p => p.trim().toLowerCase());
-	return parts.includes(userName.toLowerCase());
-};
 
 export const load = async ({ locals }) => {
 	const userName = locals.user?.userName || '';
 	const admin = isAdmin(locals);
 
-	// 1. Récupérer toutes les étapes de workflow (triées par position)
-	let allWorkflows = await locals.db
-		.select()
-		.from(workflowProjects)
-		.orderBy(asc(workflowProjects.position))
-		.all();
+	// Static workflow columns mapping to project status
+	const workflows = [
+		{ id: 'NEW_PROJECT', position: 1, workflowName: 'Nouveaux projets' },
+		{ id: 'IN_PROGRESS', position: 2, workflowName: 'En cours' },
+		{ id: 'PENDING_VALIDATION', position: 3, workflowName: 'À valider' },
+		{ id: 'READY_TO_PRINT', position: 4, workflowName: 'Prêt à imprimer' },
+		{ id: 'PRINTED', position: 5, workflowName: 'Imprimé' },
+		{ id: 'DELIVERED', position: 6, workflowName: 'Livré' },
+		{ id: 'PENDING_PAYMENT', position: 7, workflowName: 'En attente de paiement' },
+		{ id: 'CANCELLED', position: 8, workflowName: 'Annulé' }
+	];
 
-	// 2. Bootstrap / migration des workflows par défaut si vides ou si anciens
-	const hasOldDefaults = allWorkflows.some(w => 
-		['BACKLOG', 'TODO', 'IN PROGRESS', 'IN REVIEW', 'DONE'].includes(w.workflowName)
-	);
-
-	if (allWorkflows.length === 0 || hasOldDefaults) {
-		if (hasOldDefaults) {
-			await locals.db.delete(workflowProjects);
-		}
-
-		const defaults = [
-			{ id: crypto.randomUUID(), position: 1, workflowName: 'Nouveaux projets' },
-			{ id: crypto.randomUUID(), position: 2, workflowName: 'En cours' },
-			{ id: crypto.randomUUID(), position: 3, workflowName: 'À valider' },
-			{ id: crypto.randomUUID(), position: 4, workflowName: 'Impression' },
-			{ id: crypto.randomUUID(), position: 5, workflowName: 'Paiement' },
-			{ id: crypto.randomUUID(), position: 6, workflowName: 'Archives' }
-		];
-
-		for (const d of defaults) {
-			await locals.db.insert(workflowProjects).values(d);
-		}
-
-		// Migrer les projets existants ayant les anciens workflowName
-		const migrationMap: Record<string, string> = {
-			'BACKLOG': 'Nouveaux projets',
-			'TODO': 'Nouveaux projets',
-			'IN PROGRESS': 'En cours',
-			'IN REVIEW': 'À valider',
-			'DONE': 'Archives'
-		};
-
-		for (const [oldName, newName] of Object.entries(migrationMap)) {
-			await locals.db
-				.update(projects)
-				.set({ workflowName: newName })
-				.where(eq(projects.workflowName, oldName));
-		}
-
-		allWorkflows = await locals.db
-			.select()
-			.from(workflowProjects)
-			.orderBy(asc(workflowProjects.position))
-			.all();
-	}
-
-	// 3. Récupérer tous les projets avec nom de client dénormalisé
+	// Retrieve all projects with client company name
 	const projectsQuery = locals.db
 		.select({
 			id: projects.id,
@@ -85,10 +29,9 @@ export const load = async ({ locals }) => {
 			companyName: projects.companyName,
 			description: projects.description,
 			statusProject: projects.statusProject,
-			workflowName: projects.workflowName,
 			priority: projects.priority,
-			budgetAmount: projects.budgetAmount,
-			spentAmount: projects.spentAmount,
+			budgetAmountCents: projects.budgetAmountCents,
+			spentAmountCents: projects.spentAmountCents,
 			progressPercentage: projects.progressPercentage,
 			startDate: projects.startDate,
 			dueDate: projects.dueDate,
@@ -99,19 +42,36 @@ export const load = async ({ locals }) => {
 		.from(projects)
 		.leftJoin(clients, eq(projects.clientId, clients.id));
 
-	// Les non-admins ne voient que les projets créés par eux-mêmes
-	const allProjects = admin
+	// Non-admins only see projects created by themselves
+	const rawProjects = admin
 		? await projectsQuery.all()
 		: await projectsQuery.where(eq(projects.createdBy, userName)).all();
 
-	// Filtrer les clients pour le menu déroulant si non-admin
-	const rawClients = await locals.db.select().from(clients).all();
-	const allClients = admin
-		? rawClients
-		: rawClients.filter(c => matchesUserAccess(c.usersAccess, userName));
+	// Convert cents → decimals for UI
+	const allProjects = rawProjects.map(p => ({
+		...p,
+		budgetAmount: (p.budgetAmountCents || 0) / 1000,
+		spentAmount: (p.spentAmountCents || 0) / 1000
+	}));
+
+	// Filter clients for dropdown if non-admin
+	let allClients;
+	if (admin) {
+		allClients = await locals.db.select().from(clients).all();
+	} else {
+		const accessRows = await locals.db
+			.select({ clientId: clientUserAccess.clientId })
+			.from(clientUserAccess)
+			.where(eq(clientUserAccess.userName, userName))
+			.all();
+		const accessibleIds = accessRows.map(r => r.clientId);
+		allClients = accessibleIds.length > 0
+			? await locals.db.select().from(clients).where(inArray(clients.id, accessibleIds)).all()
+			: [];
+	}
 
 	return {
-		workflows: allWorkflows,
+		workflows,
 		projects: allProjects,
 		clients: allClients
 	};
@@ -121,196 +81,46 @@ export const actions = {
 	updateProjectStep: async ({ request, locals }) => {
 		const data = await request.formData();
 		const projectId = parseInt(data.get('projectId')?.toString() || '0');
-		const workflowName = data.get('workflowName')?.toString();
+		const workflowName = data.get('workflowName')?.toString(); // This is the new status value
 
 		if (!projectId || !workflowName) {
 			return fail(400, { missing: true });
 		}
 
-		// Récupérer le projet pour valider l'existence et l'accès
+		// Retrieve project to validate existence and access
 		const proj = await locals.db.select().from(projects).where(eq(projects.id, projectId)).get();
 		if (!proj) {
 			return fail(404, { error: 'Projet introuvable' });
 		}
 
-		// Sécurité : Si non-admin, on ne peut mettre à jour que ses propres projets
+		// Security: Non-admin can only update their own projects
 		if (!isAdmin(locals) && proj.createdBy !== locals.user?.userName) {
 			return fail(403, { forbidden: true });
+		}
+
+		// Validate that the status is one of the allowed values
+		const allowedStatuses = [
+			'NEW_PROJECT',
+			'IN_PROGRESS',
+			'PENDING_VALIDATION',
+			'READY_TO_PRINT',
+			'PRINTED',
+			'DELIVERED',
+			'PENDING_PAYMENT',
+			'CANCELLED'
+		];
+
+		if (!allowedStatuses.includes(workflowName)) {
+			return fail(400, { error: 'Statut invalide' });
 		}
 
 		await locals.db
 			.update(projects)
 			.set({
-				workflowName,
+				statusProject: workflowName,
 				updatedAt: new Date().toISOString()
 			})
 			.where(eq(projects.id, projectId));
-
-		return { success: true };
-	},
-
-	createWorkflowStep: async ({ request, locals }) => {
-		if (!isAdmin(locals)) {
-			return fail(403, { forbidden: true });
-		}
-		const data = await request.formData();
-		const name = data.get('workflowName')?.toString();
-
-		if (!name) {
-			return fail(400, { missing: true });
-		}
-
-		const trimmedName = name.trim();
-
-		// Récupérer la position max pour ajouter à la fin
-		const currentWorkflows = await locals.db
-			.select()
-			.from(workflowProjects)
-			.all();
-		const nextPosition = currentWorkflows.length > 0
-			? Math.max(...currentWorkflows.map(w => w.position)) + 1
-			: 1;
-
-		await locals.db.insert(workflowProjects).values({
-			id: crypto.randomUUID(),
-			position: nextPosition,
-			workflowName: trimmedName
-		});
-
-		return { success: true };
-	},
-
-	renameWorkflowStep: async ({ request, locals }) => {
-		if (!isAdmin(locals)) {
-			return fail(403, { forbidden: true });
-		}
-		const data = await request.formData();
-		const id = data.get('id')?.toString();
-		const newName = data.get('workflowName')?.toString();
-
-		if (!id || !newName) {
-			return fail(400, { missing: true });
-		}
-
-		const trimmedNewName = newName.trim();
-
-		// Trouver l'ancien nom pour migrer les projets
-		const oldStep = await locals.db
-			.select()
-			.from(workflowProjects)
-			.where(eq(workflowProjects.id, id))
-			.get();
-
-		if (oldStep) {
-			// Renommer l'étape
-			await locals.db
-				.update(workflowProjects)
-				.set({ workflowName: trimmedNewName })
-				.where(eq(workflowProjects.id, id));
-
-			// Mettre à jour tous les projets dans l'ancienne étape
-			await locals.db
-				.update(projects)
-				.set({ workflowName: trimmedNewName })
-				.where(eq(projects.workflowName, oldStep.workflowName));
-		}
-
-		return { success: true };
-	},
-
-	moveWorkflowStep: async ({ request, locals }) => {
-		if (!isAdmin(locals)) {
-			return fail(403, { forbidden: true });
-		}
-		const data = await request.formData();
-		const id = data.get('id')?.toString();
-		const direction = data.get('direction')?.toString(); // 'left' or 'right'
-
-		if (!id || !direction) {
-			return fail(400, { missing: true });
-		}
-
-		// Trouver la colonne courante
-		const currentColumn = await locals.db
-			.select()
-			.from(workflowProjects)
-			.where(eq(workflowProjects.id, id))
-			.get();
-
-		if (!currentColumn) {
-			return fail(404, { notFound: true });
-		}
-
-		let targetColumn = null;
-
-		if (direction === 'left') {
-			// Colonne avec la plus grande position < position courante
-			const columns = await locals.db
-				.select()
-				.from(workflowProjects)
-				.where(lt(workflowProjects.position, currentColumn.position))
-				.orderBy(asc(workflowProjects.position))
-				.all();
-			if (columns.length > 0) {
-				targetColumn = columns[columns.length - 1];
-			}
-		} else if (direction === 'right') {
-			// Colonne avec la plus petite position > position courante
-			const columns = await locals.db
-				.select()
-				.from(workflowProjects)
-				.where(gt(workflowProjects.position, currentColumn.position))
-				.orderBy(asc(workflowProjects.position))
-				.all();
-			if (columns.length > 0) {
-				targetColumn = columns[0];
-			}
-		}
-
-		if (targetColumn) {
-			// Échanger les positions
-			const tempPos = currentColumn.position;
-			await locals.db
-				.update(workflowProjects)
-				.set({ position: targetColumn.position })
-				.where(eq(workflowProjects.id, currentColumn.id));
-
-			await locals.db
-				.update(workflowProjects)
-				.set({ position: tempPos })
-				.where(eq(workflowProjects.id, targetColumn.id));
-		}
-
-		return { success: true };
-	},
-
-	deleteWorkflowStep: async ({ request, locals }) => {
-		if (!isAdmin(locals)) {
-			return fail(403, { forbidden: true });
-		}
-		const data = await request.formData();
-		const id = data.get('id')?.toString();
-
-		if (!id) {
-			return fail(400, { missing: true });
-		}
-
-		// Trouver l'étape pour remettre les projets affectés en BACKLOG
-		const step = await locals.db
-			.select()
-			.from(workflowProjects)
-			.where(eq(workflowProjects.id, id))
-			.get();
-
-		if (step) {
-			await locals.db.delete(workflowProjects).where(eq(workflowProjects.id, id));
-
-			// Remettre les projets de cette étape en 'Nouveaux projets'
-			await locals.db
-				.update(projects)
-				.set({ workflowName: 'Nouveaux projets' })
-				.where(eq(projects.workflowName, step.workflowName));
-		}
 
 		return { success: true };
 	}

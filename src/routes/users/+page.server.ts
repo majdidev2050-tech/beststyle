@@ -1,12 +1,12 @@
 import { users } from '$lib/server/db/schema';
-import { eq, like } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { fail } from '@sveltejs/kit';
 
 export const load = async ({ locals, url }) => {
 	const searchText = url.searchParams.get('search_text') || '';
 
 	const allUsers = await (searchText
-		? locals.db.select().from(users).where(like(users.searchText, `%${searchText}%`)).limit(100).all()
+		? locals.db.select().from(users).where(sql`users.id IN (SELECT rowid FROM users_fts WHERE users_fts MATCH ${searchText + '*'})`).limit(100).all()
 		: locals.db.select().from(users).limit(100).all());
 
 	return {

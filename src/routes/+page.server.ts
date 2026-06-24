@@ -1,4 +1,4 @@
-import { projects, clients, payments } from '$lib/server/db/schema';
+import { projects, clients, payments, clientUserAccess } from '$lib/server/db/schema';
 import { count, ne, and, eq, inArray } from 'drizzle-orm';
 
 const isAdmin = (locals: App.Locals) => locals.user?.role === 'SUPER_ADMIN' || locals.user?.role === 'ADMIN';
@@ -8,21 +8,6 @@ const hasPaymentAccess = (locals: App.Locals) => {
 	if (isAdmin(locals)) return true;
 	const role = locals.user?.role?.toUpperCase();
 	return role === 'PROJET+PAIEMENT' || role === 'PROJECT_PAYMENT' || role === 'PROJECT+PAYMENT';
-};
-
-const matchesUserAccess = (usersAccessVal: string | null | undefined, userName: string) => {
-	if (!usersAccessVal) return false;
-	const trimmed = usersAccessVal.trim();
-	if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
-		try {
-			const parsed = JSON.parse(trimmed);
-			if (Array.isArray(parsed)) {
-				return parsed.map(p => p.toString().toLowerCase()).includes(userName.toLowerCase());
-			}
-		} catch (e) {}
-	}
-	const parts = trimmed.split(/[\s,;]+/).map(p => p.trim().toLowerCase());
-	return parts.includes(userName.toLowerCase());
 };
 
 export const load = async ({ locals }) => {
@@ -45,10 +30,13 @@ export const load = async ({ locals }) => {
 					.get();
 				activeProjectsCount = activeProjectsRes?.value || 0;
 			} else if (isClient) {
-				// Récupérer les clients autorisés pour le rôle CLIENT
-				const rawClients = await locals.db.select().from(clients).all();
-				const allowedClients = rawClients.filter(c => matchesUserAccess(c.usersAccess, userName));
-				const allowedClientIds = allowedClients.map(c => c.id);
+				// Récupérer les clients autorisés via la table de liaison
+				const accessRows = await locals.db
+					.select({ clientId: clientUserAccess.clientId })
+					.from(clientUserAccess)
+					.where(eq(clientUserAccess.userName, userName))
+					.all();
+				const allowedClientIds = accessRows.map(r => r.clientId);
 
 				if (allowedClientIds.length > 0) {
 					const activeProjectsRes = await locals.db
@@ -90,7 +78,7 @@ export const load = async ({ locals }) => {
 					.from(projects)
 					.where(eq(projects.createdBy, userName))
 					.all();
-				const myProjectIds = myProjects.map(p => String(p.id));
+				const myProjectIds = myProjects.map(p => p.id);
 
 				if (myProjectIds.length > 0) {
 					const paymentsRes = await locals.db
@@ -113,9 +101,12 @@ export const load = async ({ locals }) => {
 					.get();
 				totalClientsCount = clientsRes?.value || 0;
 			} else {
-				const rawClients = await locals.db.select().from(clients).all();
-				const allowedClients = rawClients.filter(c => matchesUserAccess(c.usersAccess, userName));
-				totalClientsCount = allowedClients.length;
+				const accessRows = await locals.db
+					.select({ clientId: clientUserAccess.clientId })
+					.from(clientUserAccess)
+					.where(eq(clientUserAccess.userName, userName))
+					.all();
+				totalClientsCount = accessRows.length;
 			}
 		} catch (err) {
 			console.error('Failed to load dashboard statistics:', err);

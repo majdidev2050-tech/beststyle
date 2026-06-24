@@ -7,6 +7,24 @@
 	let showEditModal = $state(false);
 	let selectedProject = $state<any>(null);
 
+	const statusLabels: Record<string, string> = {
+		NEW_PROJECT: 'Nouveau',
+		IN_PROGRESS: 'En cours',
+		PENDING_VALIDATION: 'À valider',
+		READY_TO_PRINT: 'Prêt à imprimer',
+		PRINTED: 'Imprimé',
+		DELIVERED: 'Livré',
+		PENDING_PAYMENT: 'En attente de paiement',
+		CANCELLED: 'Annulé'
+	};
+
+	const priorityLabels: Record<string, string> = {
+		LOW: 'Faible',
+		MEDIUM: 'Moyen',
+		HIGH: 'Élevé',
+		URGENT: 'Urgent'
+	};
+
 	interface ImageFile {
 		file: File;
 		preview: string;
@@ -156,12 +174,12 @@
 					</td>
 					<td>
 						<span class="badge badge-status-{project.statusProject.toLowerCase()}"
-							>{project.statusProject}</span
+							>{statusLabels[project.statusProject] ?? project.statusProject}</span
 						>
 					</td>
 					<td>
 						<span class="badge badge-priority-{project.priority.toLowerCase()}"
-							>{project.priority}</span
+							>{priorityLabels[project.priority] ?? project.priority}</span
 						>
 					</td>
 					<td>
@@ -275,10 +293,13 @@
 							<div class="form-group">
 								<label class="form-label" for="statusProject">Statut</label>
 								<select class="input-field" id="statusProject" name="statusProject">
-									<option value="PLANNING">Planification</option>
-									<option value="ACTIVE">Actif</option>
-									<option value="ON_HOLD">En pause</option>
-									<option value="COMPLETED">Terminé</option>
+									<option value="NEW_PROJECT" selected>Nouveau</option>
+									<option value="IN_PROGRESS">En cours</option>
+									<option value="PENDING_VALIDATION">À valider</option>
+									<option value="READY_TO_PRINT">Prêt à imprimer</option>
+									<option value="PRINTED">Imprimé</option>
+									<option value="DELIVERED">Livré</option>
+									<option value="PENDING_PAYMENT">En attente de paiement</option>
 									<option value="CANCELLED">Annulé</option>
 								</select>
 							</div>
@@ -469,10 +490,13 @@
 									bind:value={selectedProject.statusProject}
 									disabled={data.readonly}
 								>
-									<option value="PLANNING">Planification</option>
-									<option value="ACTIVE">Actif</option>
-									<option value="ON_HOLD">En pause</option>
-									<option value="COMPLETED">Terminé</option>
+									<option value="NEW_PROJECT">Nouveau</option>
+									<option value="IN_PROGRESS">En cours</option>
+									<option value="PENDING_VALIDATION">À valider</option>
+									<option value="READY_TO_PRINT">Prêt à imprimer</option>
+									<option value="PRINTED">Imprimé</option>
+									<option value="DELIVERED">Livré</option>
+									<option value="PENDING_PAYMENT">En attente de paiement</option>
 									<option value="CANCELLED">Annulé</option>
 								</select>
 							</div>
@@ -1003,4 +1027,28 @@
 			gap: 1.25rem;
 		}
 	}
+
+	/* --- Status Badges Aesthetics --- */
+	.badge {
+		padding: 0.22rem 0.7rem;
+		border-radius: 100px;
+		font-size: 0.72rem;
+		font-weight: 600;
+		letter-spacing: 0.03em;
+		display: inline-block;
+		white-space: nowrap;
+	}
+	.badge-status-new_project { background: rgba(99, 102, 241, 0.15); color: #4f46e5; }
+	.badge-status-in_progress { background: rgba(245, 158, 11, 0.15); color: #d97706; }
+	.badge-status-pending_validation { background: rgba(16, 185, 129, 0.15); color: #059669; }
+	.badge-status-ready_to_print { background: rgba(6, 182, 212, 0.15); color: #0891b2; }
+	.badge-status-printed { background: rgba(59, 130, 246, 0.15); color: #2563eb; }
+	.badge-status-delivered { background: rgba(16, 185, 129, 0.15); color: #10b981; }
+	.badge-status-pending_payment { background: rgba(239, 68, 68, 0.15); color: #dc2626; }
+	.badge-status-cancelled { background: rgba(107, 114, 128, 0.15); color: #4b5563; }
+
+	.badge-priority-low { background: rgba(156, 163, 175, 0.15); color: #4b5563; }
+	.badge-priority-medium { background: rgba(59, 130, 246, 0.15); color: #2563eb; }
+	.badge-priority-high { background: rgba(245, 158, 11, 0.15); color: #d97706; }
+	.badge-priority-urgent { background: rgba(239, 68, 68, 0.15); color: #dc2626; }
 </style>

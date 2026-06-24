@@ -1,5 +1,5 @@
-import { payments, projects, clients } from '$lib/server/db/schema';
-import { eq, like, and, gte, lte, inArray } from 'drizzle-orm';
+import { payments, projects, clients, clientUserAccess } from '$lib/server/db/schema';
+import { eq, and, gte, lte, inArray, sql } from 'drizzle-orm';
 import { fail } from '@sveltejs/kit';
 
 const isAdmin = (locals: App.Locals) => locals.user?.role === 'SUPER_ADMIN' || locals.user?.role === 'ADMIN';
@@ -8,21 +8,6 @@ const hasPaymentAccess = (locals: App.Locals) => {
 	if (isAdmin(locals)) return true;
 	const role = locals.user?.role?.toUpperCase();
 	return role === 'PROJET+PAIEMENT' || role === 'PROJECT_PAYMENT' || role === 'PROJECT+PAYMENT';
-};
-
-const matchesUserAccess = (usersAccessVal: string | null | undefined, userName: string) => {
-	if (!usersAccessVal) return false;
-	const trimmed = usersAccessVal.trim();
-	if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
-		try {
-			const parsed = JSON.parse(trimmed);
-			if (Array.isArray(parsed)) {
-				return parsed.map(p => p.toString().toLowerCase()).includes(userName.toLowerCase());
-			}
-		} catch (e) {}
-	}
-	const parts = trimmed.split(/[\s,;]+/).map(p => p.trim().toLowerCase());
-	return parts.includes(userName.toLowerCase());
 };
 
 export const load = async ({ locals, url }) => {
@@ -37,15 +22,25 @@ export const load = async ({ locals, url }) => {
 		? await locals.db.select().from(projects).all()
 		: await locals.db.select().from(projects).where(eq(projects.createdBy, userName)).all();
 
-	// Non-admin can only see clients they have access to
-	const rawClients = await locals.db.select().from(clients).all();
-	const allClients = admin
-		? rawClients
-		: rawClients.filter(c => matchesUserAccess(c.usersAccess, userName));
+	// Non-admin can only see clients they have access to via join table
+	let allClients;
+	if (admin) {
+		allClients = await locals.db.select().from(clients).all();
+	} else {
+		const accessRows = await locals.db
+			.select({ clientId: clientUserAccess.clientId })
+			.from(clientUserAccess)
+			.where(eq(clientUserAccess.userName, userName))
+			.all();
+		const accessibleIds = accessRows.map(r => r.clientId);
+		allClients = accessibleIds.length > 0
+			? await locals.db.select().from(clients).where(inArray(clients.id, accessibleIds)).all()
+			: [];
+	}
 
 	const conditions = [];
 	if (searchText) {
-		conditions.push(like(payments.searchText, `%${searchText}%`));
+		conditions.push(sql`payments.id IN (SELECT rowid FROM payments_fts WHERE payments_fts MATCH ${searchText + '*'})`);
 	}
 	if (dateDebut) {
 		conditions.push(gte(payments.paymentDate, dateDebut));
@@ -64,7 +59,7 @@ export const load = async ({ locals, url }) => {
 			contactName: payments.contactName,
 			contactEmail: payments.contactEmail,
 			projectName: payments.projectName,
-			amount: payments.amount,
+			amountCents: payments.amountCents,
 			paymentType: payments.paymentType,
 			statusPayment: payments.statusPayment,
 			invoiceNumber: payments.invoiceNumber,
@@ -78,20 +73,26 @@ export const load = async ({ locals, url }) => {
 		.from(payments);
 
 	// Non-admin must have the 'projet+paiement' role to see payments, and only for their own projects
-	let allPayments: any[] = [];
+	let rawPayments: any[] = [];
 	if (admin) {
-		allPayments = await (conditions.length > 0
+		rawPayments = await (conditions.length > 0
 			? baseQuery.where(and(...conditions)).limit(100).all()
 			: baseQuery.limit(100).all());
 	} else if (hasPaymentAccess(locals)) {
-		const myProjectIds = allProjects.map(p => String(p.id));
+		const myProjectIds = allProjects.map(p => p.id);
 		if (myProjectIds.length > 0) {
 			const finalConditions = [...conditions, inArray(payments.projectId, myProjectIds)];
-			allPayments = await baseQuery.where(and(...finalConditions)).limit(100).all();
+			rawPayments = await baseQuery.where(and(...finalConditions)).limit(100).all();
 		} else {
-			allPayments = [];
+			rawPayments = [];
 		}
 	}
+
+	// Convertir cents → décimaux pour l'UI
+	const allPayments = rawPayments.map(p => ({
+		...p,
+		amount: (p.amountCents || 0) / 1000
+	}));
 
 	return {
 		payments: allPayments,
@@ -137,16 +138,18 @@ export const actions = {
 			return fail(403, { forbidden: true });
 		}
 
+		const amountCents = Math.round(amount * 1000);
+
 		// uuid et created_by générés automatiquement côté serveur
 		await locals.db.insert(payments).values({
 			uuid: crypto.randomUUID(),
-			projectId: String(projectId),
-			clientId: String(clientId),
+			projectId,
+			clientId,
 			companyName: client.companyName,
 			contactName: client.contactName || null,
 			contactEmail: client.contactEmail || null,
 			projectName: project.projectName,
-			amount,
+			amountCents,
 			paymentType,
 			statusPayment,
 			invoiceNumber: invoiceNumber || null,
@@ -158,10 +161,10 @@ export const actions = {
 
 		// Mettre à jour le montant dépensé du projet si le statut est PAID
 		if (statusPayment === 'PAID') {
-			const currentSpent = project.spentAmount || 0;
+			const currentSpentCents = project.spentAmountCents || 0;
 			await locals.db
 				.update(projects)
-				.set({ spentAmount: currentSpent + amount })
+				.set({ spentAmountCents: currentSpentCents + amountCents })
 				.where(eq(projects.id, projectId));
 		}
 
@@ -211,16 +214,18 @@ export const actions = {
 			return fail(403, { forbidden: true });
 		}
 
+		const amountCents = Math.round(amount * 1000);
+
 		await locals.db
 			.update(payments)
 			.set({
-				projectId: String(projectId),
-				clientId: String(clientId),
+				projectId,
+				clientId,
 				companyName: client.companyName,
 				contactName: client.contactName || null,
 				contactEmail: client.contactEmail || null,
 				projectName: project.projectName,
-				amount,
+				amountCents,
 				paymentType,
 				statusPayment,
 				invoiceNumber: invoiceNumber || null,
@@ -231,19 +236,19 @@ export const actions = {
 			})
 			.where(eq(payments.id, id));
 
-		// Ajuster le spentAmount du projet si le statut payé a changé
-		let currentSpent = project.spentAmount || 0;
+		// Ajuster le spentAmountCents du projet si le statut payé a changé
+		let currentSpentCents = project.spentAmountCents || 0;
 		// Déduire l'ancien montant s'il était PAID
 		if (oldPayment.statusPayment === 'PAID') {
-			currentSpent -= oldPayment.amount;
+			currentSpentCents -= oldPayment.amountCents;
 		}
 		// Ajouter le nouveau montant s'il est PAID
 		if (statusPayment === 'PAID') {
-			currentSpent += amount;
+			currentSpentCents += amountCents;
 		}
 		await locals.db
 			.update(projects)
-			.set({ spentAmount: Math.max(0, currentSpent) })
+			.set({ spentAmountCents: Math.max(0, currentSpentCents) })
 			.where(eq(projects.id, projectId));
 
 		return { success: true };
@@ -271,19 +276,19 @@ export const actions = {
 
 		await locals.db.delete(payments).where(eq(payments.id, id));
 
-		// Si le paiement supprimé était PAID, déduire du spentAmount du projet
+		// Si le paiement supprimé était PAID, déduire du spentAmountCents du projet
 		if (oldPayment.statusPayment === 'PAID') {
 			const project = await locals.db
 				.select()
 				.from(projects)
-				.where(eq(projects.id, parseInt(oldPayment.projectId)))
+				.where(eq(projects.id, oldPayment.projectId))
 				.get();
 			if (project) {
-				const currentSpent = project.spentAmount || 0;
+				const currentSpentCents = project.spentAmountCents || 0;
 				await locals.db
 					.update(projects)
-					.set({ spentAmount: Math.max(0, currentSpent - oldPayment.amount) })
-					.where(eq(projects.id, parseInt(oldPayment.projectId)));
+					.set({ spentAmountCents: Math.max(0, currentSpentCents - oldPayment.amountCents) })
+					.where(eq(projects.id, oldPayment.projectId));
 			}
 		}
 
